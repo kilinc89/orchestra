@@ -1,6 +1,6 @@
 # Orchestra
 
-Claude orkestre eder. GPT-5.6 ailesi ve Gemini worker olarak çalışır.
+Claude orkestre eder. GPT-5.6 ailesi, Gemini, Claude (Sonnet/Opus) ve Composer worker olarak çalışır.
 
 Claude planlar, işi böler, worker'ları paralel çalıştırır, kanıt toplar, doğrular
 ve kabul kriteri geçene kadar döngüye sokar. Claude worker grafiğinin içinde
@@ -40,31 +40,31 @@ politikası farklı). `grok` bu hesapta boş yanıt dönüyor.
 Engine adı = binary adı. Test 21 route/dispatch uyuşmazlığını denetler
 (bu gerçek bir bug'dı: route'ta `agent`, dispatch'te `cursor` yazıyordu).
 
-Her ikisi de gerçek agentic runtime: dosya okur/yazar, komut çalıştırır, test koşar.
-Orchestra ikisini tek bir `result.json` şemasına normalize eder.
+Üçü de gerçek agentic runtime: dosya okur/yazar, komut çalıştırır, test koşar.
+Orchestra üçünü tek bir `result.json` şemasına normalize eder.
 
-## Repo duzeni
+## Repo düzeni
 
 ```text
 .
-├── .gitignore                  .orchestra/ ve yerel gecici dosyalari gitten dislar.
-├── README.md                   Projeyi, tasarim kararlarini ve canli durum notlarini belgeler.
-├── SKILL.md                    Claude Code icin Orchestra kullanim protokolu ve zorunlu kurallari tanimlar.
-├── install.sh                  Skill dosyalarini ~/.claude/skills/orchestra altina kurar.
+├── .gitignore                  .orchestra/ ve yerel geçici dosyaları gitten dışlar.
+├── README.md                   Projeyi, tasarım kararlarını ve canlı durum notlarını belgeler.
+├── SKILL.md                    Claude Code için Orchestra kullanım protokolü ve zorunlu kuralları tanımlar.
+├── install.sh                  Skill dosyalarını ~/.claude/skills/orchestra altına kurar.
 ├── scripts
-│   ├── dispatch.sh             Tek worker cagrisi yapar ve sonucu normalize result.json olarak yazar.
-│   ├── lib.sh                  Ortak yardimci fonksiyonlar ve worker cagrilabilirlik kontrollerini tutar.
-│   └── orchestra.sh            preflight/workers/doctor/run/loop alt komutlarini yoneten ana CLI'dir.
-├── tasks.example.json          Gorev grafi formati icin ornek tasks.json dosyasidir.
+│   ├── dispatch.sh             Tek worker çağrısı yapar ve sonucu normalize `result.json` olarak yazar.
+│   ├── lib.sh                  Ortak yardımcı fonksiyonlar ve worker çağrılabilirlik kontrollerini tutar.
+│   └── orchestra.sh            preflight/workers/doctor/run/loop alt komutlarını yöneten ana CLI'dir.
+├── tasks.example.json          Görev grafi biçimi için örnek `tasks.json` dosyasıdır.
 ├── tests
-│   ├── check_readme.sh         README'yi workers.json ve gercek test sayisina karsi denetleyen kabul kriteridir.
-│   ├── fixture-workers.json    Testler icin izole route/worker konfigurasyonunu saglar.
+│   ├── check_readme.sh         README'yi workers.json ve gerçek test sayısına karşı denetleyen kabul kriteridir.
+│   ├── fixture-workers.json    Testler için izole route/worker konfigürasyonunu sağlar.
 │   ├── stub
-│   │   ├── agent               Sahte Cursor Agent cikisi ureten, uc sahte engine'den biri olan stubladir.
-│   │   ├── agy                 Sahte Antigravity (agy) ciktilari ureten stubladir.
-│   │   └── codex               Sahte Codex JSONL akislarini ureten stubladir.
-│   └── test_orchestra.sh       Uc engine davranisini ve dongu mantigini uctan uca test eder.
-└── workers.json                Route, worker, model ve rol eslesmelerinin kayit dosyasidir.
+│   │   ├── agent               Sahte Cursor Agent çıktısı üreten, üç sahte engine'den biri olan stub'dır.
+│   │   ├── agy                 Sahte Antigravity (agy) çıktıları üreten stub'dır.
+│   │   └── codex               Sahte Codex JSONL akışlarını üreten stub'dır.
+│   └── test_orchestra.sh       Üç engine davranışını ve döngü mantığını uçtan uca test eder.
+└── workers.json                Route, worker, model ve rol eşleşmelerinin kayıt dosyasıdır.
 ```
 
 ## Kurulum
@@ -75,7 +75,7 @@ Orchestra ikisini tek bir `result.json` şemasına normalize eder.
 ./scripts/orchestra.sh preflight
 ```
 
-Ek yapılandırma gerekmez — her iki CLI'nin mevcut girişi kullanılır.
+Ek yapılandırma gerekmez — her üç CLI'nin mevcut girişi kullanılır.
 Tek koşul `codex-cli >= 0.153.0`; eski sürüm `gpt-5.6-*` için API 400 döner.
 
 ## Kullanım
@@ -167,13 +167,13 @@ Geri alma tek komut: `git checkout .`
 tests/test_orchestra.sh
 ```
 
-60 test. Script'ler sahte bir `codex` ve sahte bir `agy` ile **gerçekten
+64 test. Script'ler sahte bir `codex`, sahte bir `agy` ve sahte bir `agent` ile **gerçekten
 çalıştırılır** — "dosya var mı" kontrolü değil, davranış testi. Sahte engine'ler
 gerçeklerinin kritik davranışını taklit eder (hata durumunda exit 0, stderr sızıntısı,
 boş çıktı, aralıklı hata). Bu paket geliştirme sırasında 8 gerçek bug yakaladı.
 
 `tests/check_readme.sh`, README'yi iddia degil olcumle denetleyen kabul kriteridir:
-enabled worker/model/engine kayitlarini `workers.json` ile, "60 test" ifadesini ise
+enabled worker/model/engine kayitlarini `workers.json` ile, "64 test" ifadesini ise
 `tests/test_orchestra.sh` icinden hesaplanan gercek sayi ile karsilastirir.
 Bu denetim `run --accept` ile dogrudan kullanilir:
 
@@ -191,7 +191,7 @@ Gerçek worker'larla, stub değil:
 
 | Koşu | Sonuç |
 |---|---|
-| `doctor` — 7 worker'a canlı ping | 5 cursor worker'ı CALISIR (6-9s), 2 codex worker'ı KIRIK (404) |
+| `doctor` — 8 worker'a canlı ping | 7 cursor worker'ı ÇALIŞIR (6-9s), 1 codex worker'ı KIRIK (404) |
 | `codex53` bozuk `Account` sınıfını düzeltti | 30s, 1 iterasyon, testler geçti |
 | `gemini` + `opus` paralel bağımsız inceleme | 48.7s duvar saati (ardışık 79s olurdu) |
 | Dosya sahipliği | Worker'lar yalnızca kendi dosyalarına yazdı |
