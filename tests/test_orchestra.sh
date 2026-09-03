@@ -212,6 +212,27 @@ chk "uclu tur basarili" "$?" "0"
 rj3="$(find "$ws3/.orchestra/runs" -name round.json | tail -1)"
 chk "uc engine de kosuldu" "$(jq -r '[.results[].engine]|sort|join(",")' "$rj3")" "agent,agy,codex"
 
+
+echo "== 23. REGRESYON: yolunda BOSLUK olan workspace =="
+# Tirnaksiz $(find ...) bosluklu yolda parcalanip round.json'u BOSALTIYORDU;
+# sonuc: basarisiz gorevler "0 gorev, 0 basarisiz" diye basarili gorunuyordu.
+wss="$TMP/ws bosluklu"; mkdir -p "$wss"
+( cd "$wss" && git init -q && git config user.email t@t && git config user.name t \
+  && echo x > f.txt && git add -A && git commit -qm baseline ) >/dev/null 2>&1
+STUB_MODE=ok /bin/bash "$ROOT/scripts/orchestra.sh" run --tasks "$TMP/mixed.json" \
+  --workspace "$wss" --max-iter 1 >/dev/null 2>&1
+chk "bosluklu yolda run" "$?" "0"
+rjs="$(find "$wss/.orchestra/runs" -name round.json | tail -1)"
+chk "sonuclar toplandi (bos degil)" "$(jq -r '.results|length' "$rjs")" "2"
+
+echo "== 24. REGRESYON: bosluklu yolda BASARISIZLIK gizlenmemeli =="
+STUB_MODE=failed_exit0 /bin/bash "$ROOT/scripts/orchestra.sh" run --tasks "$TMP/mixed.json" \
+  --workspace "$wss" --max-iter 1 >/dev/null 2>&1
+chk "basarisiz tur exit 1 dondu" "$?" "1"
+rjs2="$(find "$wss/.orchestra/runs" -name round.json | tail -1)"
+chk "basarisizlik round.json'da gorunuyor" \
+  "$(jq -r '[.results[]|select(.status!="ok")]|length' "$rjs2")" "2"
+
 echo
 if [ "$FAIL" -eq 0 ]; then echo "PASS: $PASS test gecti, 0 basarisiz"; exit 0
 else echo "FAIL: $PASS gecti, $FAIL BASARISIZ"; exit 1; fi

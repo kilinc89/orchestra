@@ -115,7 +115,16 @@ run_round() {
   done
   if ((${#pids[@]})); then for p in "${pids[@]}"; do wait "$p" 2>/dev/null || true; done; fi
 
-  jq -s '{results:.}' $(find "$round_dir" -name result.json | sort) > "$round_dir/round.json" 2>/dev/null || echo '{"results":[]}' > "$round_dir/round.json"
+  # DIKKAT: tirnaksiz $(find ...) bosluklu yollarda parcalanir; round.json bos kalir
+  # ve BASARISIZ gorevler basarili gorunur. Diziye topla, tirnakli gecir.
+  local rfiles=() rf
+  while IFS= read -r rf; do [ -n "$rf" ] && rfiles+=("$rf"); done \
+    < <(find "$round_dir" -name result.json 2>/dev/null | sort)
+  if ((${#rfiles[@]})); then
+    jq -s '{results:.}' "${rfiles[@]}" > "$round_dir/round.json"
+  else
+    echo '{"results":[]}' > "$round_dir/round.json"
+  fi
 }
 
 # workers yalnizca config'e bakar. doctor gercekten cagirir: "ok" iddiasi degil kanit.

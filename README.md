@@ -43,6 +43,30 @@ Engine adı = binary adı. Test 21 route/dispatch uyuşmazlığını denetler
 Her ikisi de gerçek agentic runtime: dosya okur/yazar, komut çalıştırır, test koşar.
 Orchestra ikisini tek bir `result.json` şemasına normalize eder.
 
+## Repo duzeni
+
+```text
+.
+├── .gitignore                  .orchestra/ ve yerel gecici dosyalari gitten dislar.
+├── README.md                   Projeyi, tasarim kararlarini ve canli durum notlarini belgeler.
+├── SKILL.md                    Claude Code icin Orchestra kullanim protokolu ve zorunlu kurallari tanimlar.
+├── install.sh                  Skill dosyalarini ~/.claude/skills/orchestra altina kurar.
+├── scripts
+│   ├── dispatch.sh             Tek worker cagrisi yapar ve sonucu normalize result.json olarak yazar.
+│   ├── lib.sh                  Ortak yardimci fonksiyonlar ve worker cagrilabilirlik kontrollerini tutar.
+│   └── orchestra.sh            preflight/workers/doctor/run/loop alt komutlarini yoneten ana CLI'dir.
+├── tasks.example.json          Gorev grafi formati icin ornek tasks.json dosyasidir.
+├── tests
+│   ├── check_readme.sh         README'yi workers.json ve gercek test sayisina karsi denetleyen kabul kriteridir.
+│   ├── fixture-workers.json    Testler icin izole route/worker konfigurasyonunu saglar.
+│   ├── stub
+│   │   ├── agent               Sahte Cursor Agent cikisi ureten, uc sahte engine'den biri olan stubladir.
+│   │   ├── agy                 Sahte Antigravity (agy) ciktilari ureten stubladir.
+│   │   └── codex               Sahte Codex JSONL akislarini ureten stubladir.
+│   └── test_orchestra.sh       Uc engine davranisini ve dongu mantigini uctan uca test eder.
+└── workers.json                Route, worker, model ve rol eslesmelerinin kayit dosyasidir.
+```
+
 ## Kurulum
 
 ```bash
@@ -147,6 +171,19 @@ tests/test_orchestra.sh
 çalıştırılır** — "dosya var mı" kontrolü değil, davranış testi. Sahte engine'ler
 gerçeklerinin kritik davranışını taklit eder (hata durumunda exit 0, stderr sızıntısı,
 boş çıktı, aralıklı hata). Bu paket geliştirme sırasında 8 gerçek bug yakaladı.
+
+`tests/check_readme.sh`, README'yi iddia degil olcumle denetleyen kabul kriteridir:
+enabled worker/model/engine kayitlarini `workers.json` ile, "60 test" ifadesini ise
+`tests/test_orchestra.sh` icinden hesaplanan gercek sayi ile karsilastirir.
+Bu denetim `run --accept` ile dogrudan kullanilir:
+
+```bash
+scripts/orchestra.sh run --tasks tasks.json --workspace ~/proje \
+  --accept "bash tests/check_readme.sh" --max-iter 3
+```
+
+Test paketi uc sahte engine ile calisir: `tests/stub/codex`, `tests/stub/agy` ve
+`tests/stub/agent` (Cursor Agent davranisini taklit eden stub).
 
 ## Canlı doğrulama
 
