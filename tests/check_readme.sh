@@ -34,9 +34,47 @@ done
 actual="$(grep -c '^  ok\|^  FAIL' <(/bin/bash "$ROOT/tests/test_orchestra.sh" 2>/dev/null) || echo 0)"
 grep -qE "\b$actual test\b" "$R" || fails+=("README'deki test sayisi gercekle uyusmuyor (gercek: $actual)")
 
-# 6) repo agacindaki her dosya "Repo duzeni" bolumunde gorunmeli
-grep -q 'check_readme.sh' "$R" || fails+=("tests/check_readme.sh README'de anilmiyor")
-grep -q 'stub/agent' "$R" || fails+=("tests/stub/agent README'de anilmiyor")
+# 6) "Repo duzeni" bolumu olmali ve git ls-files'daki HER dosyayi anmali
+if ! grep -qE '^## Repo d[uü]zeni' "$R"; then
+  fails+=("'## Repo duzeni' bolumu yok")
+else
+  while IFS= read -r f; do
+    grep -qF -- "$(basename "$f")" "$R" || fails+=("repo dosyasi README'de anilmiyor: $f")
+  done < <(git -C "$ROOT" ls-files)
+fi
+
+# 7) Turkce dokumanda Turkce karakter kullanilmali: ASCII-only baslik = uslup kaymasi
+while IFS= read -r h; do
+  case "$h" in
+    *[çğıöşüÇĞİÖŞÜ]*) ;;
+    *[Dd]uzeni*|*[Kk]osu*|*[Cc]alis*|*[Ss]onuc*|*[Gg]orev*|*[Bb]asari*)
+      fails+=("baslikta Turkce karakter eksik: $h") ;;
+  esac
+done < <(grep -E '^#{2,3} ' "$R")
+
+# 8b) 3 engine varken "ikisi/her iki" gibi ikili ifadeler kalmamali
+if [ "$(jq -r '[.routes[].engine]|unique|length' "$ROOT/workers.json")" -ge 3 ]; then
+  while IFS= read -r bad; do
+    fails+=("ikili ifade ama 3 engine var: $bad")
+  done < <(grep -nE 'Her ikisi|ikisini|her iki CLI|İki engine' "$R" | cut -c1-80)
+fi
+
+# 8c) sahte engine sayisi stub dosya sayisiyla uyusmali
+n_stub="$(ls "$ROOT/tests/stub" | wc -l | tr -d ' ')"
+for st in codex agy agent; do
+  grep -qE "\`$st\`" "$R" || fails+=("stub README'de anilmiyor: tests/stub/$st")
+done
+
+# 8d) doctor tablosundaki worker sayisi gercekle uyusmali
+n_on="$(jq -r '[.workers[]|select(.enabled)]|length' "$ROOT/workers.json")"
+grep -qE "$n_on worker" "$R" || fails+=("doctor satirindaki worker sayisi $n_on olmali")
+
+# 8) engine sayisi metinde dogru yazilmali
+n_eng="$(jq -r '[.routes[].engine]|unique|length' "$ROOT/workers.json")"
+case "$n_eng" in
+  3) grep -qE 'Üç engine|uc engine' "$R" || fails+=("engine sayisi ($n_eng) basligi yanlis")
+     grep -q 'Orchestra ikisini' "$R" && fails+=("eskimis ifade: 'Orchestra ikisini' ama $n_eng engine var") ;;
+esac
 
 # 7) kaldirilmis seyler README'de KALMAMALI
 for dead in OPENROUTER_API_KEY deepseek-v4-flash openrouter.ai; do
