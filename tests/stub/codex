@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Test icin sahte codex. STUB_MODE ile davranis secilir.
+# Gercek codex'in kritik ozelligini taklit eder: turn.failed olsa bile EXIT 0.
+set -u
+out_file=''; prev=''
+for a in "$@"; do
+  [ "$prev" = "-o" ] && out_file="$a"
+  prev="$a"
+done
+[ "${1:-}" = "--version" ] && { echo "codex-cli 0.142.0-stub"; exit 0; }
+cat > /dev/null   # prompt'u yut
+
+case "${STUB_MODE:-ok}" in
+  ok)
+    echo '{"type":"thread.started","thread_id":"stub-thread-1"}'
+    echo '{"type":"turn.started"}'
+    echo '{"type":"item.completed","item":{"model":"stub/model-x"}}'
+    echo '{"type":"turn.completed"}'
+    [ -n "$out_file" ] && printf 'STUB CIKTI: is tamamlandi\n' > "$out_file"
+    exit 0 ;;
+  failed_exit0)
+    # GERCEK DAVRANIS: API hatasi ama exit 0
+    echo '{"type":"thread.started","thread_id":"stub-thread-2"}'
+    echo '{"type":"turn.started"}'
+    echo '{"type":"error","message":"model gate 400"}'
+    echo '{"type":"turn.failed","error":{"message":"The model requires a newer version of Codex."}}'
+    echo "stub stderr: bu satir asla last.txt icine sizmamali" >&2
+    exit 0 ;;
+  empty)
+    echo '{"type":"thread.started","thread_id":"stub-thread-3"}'
+    echo '{"type":"turn.completed"}'
+    exit 0 ;;
+  hardfail)
+    echo "stub: catastrophic" >&2
+    exit 42 ;;
+  flaky)
+    # ilk cagri basarisiz, sonrakiler basarili (dongu testi)
+    n_file="${STUB_COUNT_FILE:-/tmp/orchestra-stub-count}"
+    n=$(( $(cat "$n_file" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$n_file"
+    echo '{"type":"thread.started","thread_id":"stub-flaky"}'
+    if [ "$n" -le 1 ]; then
+      echo '{"type":"turn.failed","error":{"message":"ilk deneme basarisiz"}}'
+    else
+      echo '{"type":"turn.completed"}'
+      [ -n "$out_file" ] && printf 'STUB: %s. denemede duzeldi\n' "$n" > "$out_file"
+    fi
+    exit 0 ;;
+esac

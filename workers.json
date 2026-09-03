@@ -1,0 +1,95 @@
+{
+  "$comment": "Worker kaydi. OpenRouter model ID'leri /api/v1/models, agy model ID'leri 'agy models' ile 2026-09-03'te dogrulandi. Fiyatlar USD / 1M token.",
+  "defaults": {
+    "route": "openrouter",
+    "sandbox": "danger-full-access",
+    "timeout_sec": 1800,
+    "max_parallel": 4
+  },
+  "routes": {
+    "openrouter": {
+      "provider_id": "openrouter",
+      "base_url": "https://openrouter.ai/api/v1",
+      "env_key": "OPENROUTER_API_KEY",
+      "wire_api": "chat",
+      "engine": "codex"
+    },
+    "native": {
+      "provider_id": null,
+      "note": "codex'in kendi ChatGPT OAuth'u. codex-cli 0.142.0 gpt-5.6-luna icin cok eski (API 400). 'codex update' sonrasi acilir.",
+      "engine": "codex"
+    },
+    "agy": {
+      "engine": "agy",
+      "note": "Antigravity CLI (agy 1.1.25). Kendi auth'u var, ek API key gerektirmez. Abonelik kapsaminda oldugu icin token ucreti yok.",
+      "env_key": null
+    }
+  },
+  "workers": {
+    "deepseek": {
+      "enabled": true,
+      "route": "openrouter",
+      "model": "deepseek/deepseek-v4-flash-0731",
+      "role": "loop",
+      "context": 1310720,
+      "price_in": 0.065,
+      "price_out": 0.18,
+      "use_for": "Donguler, tekrarli iterasyon, yuksek hacimli mekanik is, toplu refactor. En ucuz ve en genis baglam."
+    },
+    "gpt": {
+      "enabled": true,
+      "route": "openrouter",
+      "model": "openai/gpt-5.6-luna",
+      "role": "implement",
+      "context": 1050000,
+      "price_in": 0.2,
+      "price_out": 1.2,
+      "use_for": "Normal implementasyon, hata ayiklama, entegrasyon."
+    },
+    "gpt-native": {
+      "enabled": false,
+      "route": "native",
+      "model": "gpt-5.6-luna",
+      "role": "implement",
+      "price_in": 0.0,
+      "price_out": 0.0,
+      "use_for": "ChatGPT aboneligi uzerinden ayni model, ek token ucreti yok. 'codex update' calistirip enabled=true yap."
+    },
+    "gemini": {
+      "enabled": true,
+      "route": "agy",
+      "model": "gemini-3.1-pro-high",
+      "role": "review",
+      "price_in": 0.0,
+      "price_out": 0.0,
+      "use_for": "Bagimsiz dogrulama ve derin kod incelemesi. Farkli model ailesi oldugu icin GPT/DeepSeek korlugunu yakalar. agy aboneligi kapsaminda, ek ucret yok."
+    },
+    "gemini-flash": {
+      "enabled": true,
+      "route": "agy",
+      "model": "gemini-3.8-flash-medium",
+      "role": "review",
+      "price_in": 0.0,
+      "price_out": 0.0,
+      "use_for": "Hizli sanity-check, buyuk ciktilarin ozetlenmesi, ucuz ikinci goz. OpenRouter'da bulunmayan en yeni Flash surumu."
+    },
+    "gemini-or": {
+      "enabled": false,
+      "route": "openrouter",
+      "model": "google/gemini-3.1-pro-preview",
+      "role": "review",
+      "price_in": 2.0,
+      "price_out": 12.0,
+      "use_for": "agy calismazsa OpenRouter uzerinden Gemini yedegi. Pahali, sadece fallback."
+    },
+    "sonnet-agy": {
+      "enabled": false,
+      "route": "agy",
+      "model": "claude-sonnet-4-6",
+      "role": "review",
+      "price_in": 0.0,
+      "price_out": 0.0,
+      "use_for": "agy uzerinden Claude Sonnet 4.6. Ucuncu bir bagimsiz goz gerekirse ac."
+    }
+  }
+}

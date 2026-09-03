@@ -1,0 +1,20 @@
+{
+  "objective": "Ornek: bir modulu implemente et ve bagimsiz olarak inceletip dogrula",
+  "tasks": [
+    {
+      "id": "impl",
+      "worker": "gpt",
+      "prompt": "src/parser.ts icinde parseConfig() fonksiyonunu implemente et. SADECE src/parser.ts dosyasina yaz; baska dosyaya dokunma. Bitirdiginde ne degistirdigini ozetle."
+    },
+    {
+      "id": "tests",
+      "worker": "deepseek",
+      "prompt": "test/parser.test.ts icin parseConfig() kapsamli birim testleri yaz: gecerli girdi, bos girdi, hatali bicim, sinir degerler. SADECE test/parser.test.ts dosyasina yaz."
+    },
+    {
+      "id": "review",
+      "worker": "gemini",
+      "prompt": "src/parser.ts ve test/parser.test.ts dosyalarini incele. Hic dosya DEGISTIRME. Sadece somut hatalari, eksik sinir durumlarini ve guvenlik sorunlarini listele. Her bulgu icin dosya:satir ver."
+    }
+  ]
+}
