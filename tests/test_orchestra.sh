@@ -10,7 +10,6 @@ chk()  { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (beklenen='$3' gelen='$2
 
 TMP="$(mktemp -d -t orchestra-test)"; trap 'rm -rf "$TMP"' EXIT
 export PATH="$ROOT/tests/stub:$PATH"
-export OPENROUTER_API_KEY='test-key-not-real'
 export ORCHESTRA_WORKERS_FILE="$ROOT/tests/fixture-workers.json"
 
 echo "== 1. sozdizimi: bash 3.2 (macOS varsayilani) =="
@@ -48,10 +47,12 @@ chk "status=empty" "$(jq -r .status "$d/result.json")" "empty"
 
 echo "== 5. dispatch: worker cagrilamiyor =="
 d="$TMP/d4"
-STUB_MODE=ok OPENROUTER_API_KEY='' /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-or --task-id t4 \
+STUB_MODE=ok /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-nobin --task-id t4 \
   --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
-chk "anahtarsiz -> unavailable" "$(jq -r .status "$d/result.json")" "unavailable"
+chk "engine binary yok -> unavailable" "$(jq -r .status "$d/result.json")" "unavailable"
 chk "model uydurulmadi" "$(jq -r '.model_verified//"null"' "$d/result.json")" "null"
+if jq -r '.error' "$d/result.json" | grep -q "PATH'te yok"; then
+  ok "blocker sebebi acikca yazildi"; else bad "blocker sebebi belirsiz"; fi
 d="$TMP/d5"
 STUB_MODE=ok /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-off --task-id t5 \
   --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
@@ -146,6 +147,18 @@ if git -C "$ws2" status --porcelain | grep -q '.orchestra'; then
   bad ".orchestra/ workspace'i kirletiyor"; else ok ".orchestra/ git'ten haric tutuldu"; fi
 if grep -qxF '.orchestra/' "$ws2/.git/info/exclude" 2>/dev/null; then
   ok "exclude .git/info/exclude'a yazildi (kullanici .gitignore'u temiz)"; else bad "exclude yazilmadi"; fi
+
+
+echo "== 16. sadece codex + agy: harici saglayici kalintisi yok =="
+if grep -rIn --exclude-dir=.git --exclude-dir=tests --exclude-dir=.orchestra \
+     -iE 'openrouter|deepseek|api[_-]?key' "$ROOT" 2>/dev/null | grep -v README.md | grep -q .; then
+  bad "kodda/konfigde harici saglayici izi var"; else ok "kodda harici saglayici/anahtar izi yok"; fi
+routes="$(jq -r '.routes|keys|sort|join(",")' "$ROOT/workers.json")"
+chk "sadece iki route tanimli" "$routes" "agy,native"
+engines="$(jq -r '[.routes[].engine]|sort|unique|join(",")' "$ROOT/workers.json")"
+chk "sadece codex ve agy engine" "$engines" "agy,codex"
+if jq -e '[.routes[]|select(has("env_key"))]|length==0' "$ROOT/workers.json" >/dev/null; then
+  ok "hicbir route env_key istemiyor"; else bad "bir route hala env_key istiyor"; fi
 
 echo
 if [ "$FAIL" -eq 0 ]; then echo "PASS: $PASS test gecti, 0 basarisiz"; exit 0

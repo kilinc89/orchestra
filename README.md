@@ -8,30 +8,27 @@ değildir — kod yazmaz, orkestre eder.
 
 ## Worker'lar
 
-Hepsi `codex` CLI'nin kendi ChatGPT OAuth'u üzerinden — **ek API key yok, token ücreti yok.**
+İki CLI, ikisi de kendi girişini taşır — **harici sağlayıcı yok, API key yok.**
 
-| Worker | Model | Yol | Rol | Durum |
+| Worker | Model | CLI | Rol | Durum |
 |---|---|---|---|---|
-| `luna` | `gpt-5.6-luna` | codex native | döngü, yüksek hacim, hızlı | ✅ canlı doğrulandı |
-| `terra` | `gpt-5.6-terra` | codex native | implementasyon | ✅ canlı doğrulandı |
-| `sol` | `gpt-5.6-sol` | codex native | zor problem, son doğrulama | ✅ canlı doğrulandı |
+| `luna` | `gpt-5.6-luna` | codex | döngü, yüksek hacim, hızlı | ✅ canlı doğrulandı |
+| `terra` | `gpt-5.6-terra` | codex | implementasyon | ✅ canlı doğrulandı |
+| `sol` | `gpt-5.6-sol` | codex | zor problem, son doğrulama | ✅ canlı doğrulandı |
 | `gemini` | `gemini-3.1-pro-high` | agy | bağımsız inceleme | ⚠️ adaptör hazır, print mode timeout |
 | `gemini-flash` | `gemini-3.8-flash-medium` | agy | hızlı ikinci göz | ⚠️ aynı |
-| `gpt55` | `gpt-5.5` | codex native | regresyon karşılaştırma | kapalı |
-| `deepseek` | `deepseek/deepseek-v4-flash-0731` | OpenRouter | döngü | kapalı — key ister |
+| `gpt55` | `gpt-5.5` | codex | regresyon karşılaştırma | kapalı |
+| `sonnet` | `claude-sonnet-4-6` | agy | üçüncü bağımsız göz | kapalı |
 
 Model ID'leri uydurulmadı: `~/.codex/models_cache.json` ve `agy models` çıktısından
-alındı, native olanların **hepsi `codex exec` ile canlı çalıştırılarak** doğrulandı.
-
-ChatGPT hesabı yalnızca OpenAI modelleri sunar; DeepSeek native codex'ten çağrılamaz.
-İstenirse `export OPENROUTER_API_KEY=...` + `workers.json` içinde `enabled: true`.
+alındı; `codex` tarafındakilerin **hepsi canlı çalıştırılarak** doğrulandı.
 
 ## İki engine
 
-| Engine | CLI | Çıktı | Kullanan yollar |
+| Engine | CLI | Çıktı | Auth |
 |---|---|---|---|
-| `codex` | OpenAI Codex CLI | JSONL event akışı | `openrouter`, `native` |
-| `agy` | Antigravity CLI | tek JSON nesnesi | `agy` |
+| `codex` | OpenAI Codex CLI | JSONL event akışı | ChatGPT girişi (`codex login`) |
+| `agy` | Antigravity CLI | tek JSON nesnesi | kendi girişi (`~/.antigravity`) |
 
 Her ikisi de gerçek agentic runtime: dosya okur/yazar, komut çalıştırır, test koşar.
 Orchestra ikisini tek bir `result.json` şemasına normalize eder.
@@ -44,8 +41,8 @@ Orchestra ikisini tek bir `result.json` şemasına normalize eder.
 ./scripts/orchestra.sh preflight
 ```
 
-Ek yapılandırma gerekmez — `codex` CLI'nin mevcut girişi kullanılır.
-Gereken tek şey `codex-cli >= 0.153.0` (eski sürüm `gpt-5.6-*` için API 400 döner).
+Ek yapılandırma gerekmez — her iki CLI'nin mevcut girişi kullanılır.
+Tek koşul `codex-cli >= 0.153.0`; eski sürüm `gpt-5.6-*` için API 400 döner.
 
 ## Kullanım
 
@@ -133,7 +130,7 @@ Geri alma tek komut: `git checkout .`
 tests/test_orchestra.sh
 ```
 
-41 test. Script'ler sahte bir `codex` ve sahte bir `agy` ile **gerçekten
+46 test. Script'ler sahte bir `codex` ve sahte bir `agy` ile **gerçekten
 çalıştırılır** — "dosya var mı" kontrolü değil, davranış testi. Sahte engine'ler
 gerçeklerinin kritik davranışını taklit eder (hata durumunda exit 0, stderr sızıntısı,
 boş çıktı, aralıklı hata). Bu paket geliştirme sırasında 8 gerçek bug yakaladı.
@@ -159,3 +156,5 @@ Uçtan uca, gerçek worker'larla (stub değil):
   için gerçek bağımsızlık sağlamaz — bu bilinçli bir taviz).
 - `codex-cli` en az 0.153.0 olmalı. Eski sürüm `gpt-5.6-*` için
   `"requires a newer version of Codex"` (API 400) döndürür.
+- Yalnızca `codex` ve `agy` kullanılır. Harici sağlayıcı, proxy ya da API key
+  yolu bilinçli olarak yoktur; test 16 bunun kodda kalmadığını denetler.

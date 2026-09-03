@@ -29,7 +29,8 @@ Worker'ın gerçekten hangi modelle çalıştığı `result.json` içindeki
 | `review` | `sol` | Zor problemler, mimari kararlar, son doğrulama. Ailenin en güçlüsü. |
 | `review` | `gemini` / `gemini-flash` | Gerçekten bağımsız inceleme (farklı model ailesi). agy print mode şu an timeout veriyor — `workers` çıktısında `ok` görmeden kullanma. |
 
-Hepsi `codex` CLI'nin mevcut girişini kullanır; API key gerekmez.
+İki engine vardır: `codex` (GPT-5.6 ailesi, ChatGPT girişi) ve `agy` (Gemini).
+Her ikisi de kendi girişini taşır — harici sağlayıcı ya da anahtar yoktur.
 
 Kullanıcı açıkça worker seçtiyse ona uy. Seçmediyse yukarıdaki sınıflandırmayı uygula.
 Bir işi asla tek worker'a hem yaptırıp hem doğrulatma — **uygulayan ile doğrulayan
@@ -61,7 +62,7 @@ farklı worker olmalı.** İdeali farklı model ailesidir (`gemini`); o çağrı
   "objective": "Insan tarafindan okunabilir hedef",
   "tasks": [
     {"id": "impl", "worker": "gpt", "prompt": "...", "cd": "/opsiyonel/alt/dizin"},
-    {"id": "loop", "worker": "deepseek", "prompt": "..."}
+    {"id": "loop", "worker": "luna", "prompt": "..."}
   ]
 }
 ```

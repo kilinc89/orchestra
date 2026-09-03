@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Orchestra - Claude orkestre eder, DeepSeek/GPT/Gemini worker'lari calisir.
+# Orchestra - Claude orkestre eder; codex (GPT-5.6) ve agy (Gemini) worker calisir.
 # Alt komutlar: preflight | workers | run | loop
 set -euo pipefail
 . "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/lib.sh"
@@ -50,27 +50,29 @@ guard_workspace() {
 }
 
 cmd_workers() {
-  printf '%-14s %-8s %-10s %-34s %-9s %s\n' WORKER DURUM ROL MODEL '$/M-in' 'CAGRILABILIR'
-  local w
+  printf '%-14s %-6s %-10s %-24s %-8s %s\n' WORKER ACIK ROL MODEL CLI 'CAGRILABILIR'
+  local w r
   for w in $(jq -r '.workers|keys[]' "$(workers_file)"); do
-    printf '%-14s %-8s %-10s %-34s %-9s %s\n' \
+    r="$(wcfg "$w" route)"; [ -n "$r" ] || r="$(dcfg route)"
+    printf '%-14s %-6s %-10s %-24s %-8s %s\n' \
       "$w" "$(wcfg "$w" enabled)" "$(wcfg "$w" role)" "$(wcfg "$w" model)" \
-      "$(wcfg "$w" price_in)" "$(worker_callable "$w" || true)"
+      "$(rcfg "$r" engine)" "$(worker_callable "$w" || true)"
   done
 }
 
 cmd_preflight() {
   local ws="${1:-$PWD}" ok=0
   echo "== Orchestra preflight =="
-  for c in codex jq git python3; do
+  for c in codex agy jq git python3; do
     if command -v "$c" >/dev/null 2>&1; then printf '  [OK]  %s\n' "$c"
     else printf '  [--]  %s eksik\n' "$c"; ok=1; fi
   done
   printf '  [%s]  codex-cli %s\n' "$( [ -n "$(command -v codex)" ] && echo OK || echo -- )" "$(codex --version 2>/dev/null | awk '{print $2}')"
-  local envk; envk="$(rcfg openrouter env_key)"
-  eval "local kv=\${$envk:-}"
-  if [ -n "${kv:-}" ]; then printf '  [OK]  %s ayarli\n' "$envk"
-  else printf '  [--]  %s YOK -> openrouter worker'"'"'lari calismaz\n' "$envk"; ok=1; fi
+  if [ -f "${CODEX_HOME:-$HOME/.codex}/auth.json" ]; then printf '  [OK]  codex girisi var\n'
+  else printf '  [--]  codex girisi YOK -> codex login\n'; ok=1; fi
+  if command -v agy >/dev/null 2>&1 && [ -d "$HOME/.antigravity" ]; then
+    printf '  [OK]  agy %s\n' "$(agy --version 2>/dev/null | head -1)"
+  else printf '  [--]  agy yok/yapilandirilmamis -> gemini worker'"'"'lari calismaz\n'; ok=1; fi
   echo "-- workspace: $ws"
   if git -C "$ws" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     if [ -z "$(git -C "$ws" status --porcelain)" ]; then echo "  [OK]  git deposu, temiz"

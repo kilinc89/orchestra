@@ -1,5 +1,5 @@
 {
-  "$comment": "Worker kaydi. Native model ID'leri ~/.codex/models_cache.json'dan ve HEPSI codex exec ile CANLI dogrulandi (2026-09-03). agy ID'leri 'agy models' ciktisindan. Fiyatlar USD / 1M token; native = ChatGPT aboneligi, ek token ucreti yok.",
+  "$comment": "Worker kaydi. Iki engine: codex (native ChatGPT OAuth) ve agy (Antigravity CLI). Harici API key YOK. Native model ID'leri ~/.codex/models_cache.json'dan alindi ve codex exec ile CANLI dogrulandi (2026-09-03); agy ID'leri 'agy models' ciktisindan.",
   "defaults": {
     "route": "native",
     "sandbox": "danger-full-access",
@@ -7,22 +7,13 @@
     "max_parallel": 4
   },
   "routes": {
-    "openrouter": {
-      "provider_id": "openrouter",
-      "base_url": "https://openrouter.ai/api/v1",
-      "env_key": "OPENROUTER_API_KEY",
-      "wire_api": "chat",
-      "engine": "codex"
-    },
     "native": {
       "engine": "codex",
-      "note": "codex CLI'nin kendi ChatGPT OAuth'u. Ek API key gerekmez. codex-cli >= 0.153.0 sart.",
-      "env_key": null
+      "note": "codex CLI'nin kendi ChatGPT OAuth'u. Ek API key gerekmez. codex-cli >= 0.153.0 sart."
     },
     "agy": {
       "engine": "agy",
-      "note": "Antigravity CLI (agy 1.1.25). Kendi auth'u var, ek API key gerektirmez. Abonelik kapsaminda oldugu icin token ucreti yok.",
-      "env_key": null
+      "note": "Antigravity CLI. Kendi auth'unu tasir, ek API key gerekmez."
     }
   },
   "workers": {
@@ -31,8 +22,6 @@
       "route": "native",
       "model": "gpt-5.6-luna",
       "role": "loop",
-      "price_in": 0.0,
-      "price_out": 0.0,
       "verified": "2026-09-03 canli",
       "use_for": "Donguler, tekrarli iterasyon, toplu mekanik is, hizli implementasyon. En dusuk gecikme."
     },
@@ -41,8 +30,6 @@
       "route": "native",
       "model": "gpt-5.6-terra",
       "role": "implement",
-      "price_in": 0.0,
-      "price_out": 0.0,
       "verified": "2026-09-03 canli",
       "use_for": "Normal implementasyon, hata ayiklama, entegrasyon. Varsayilan uygulayici."
     },
@@ -51,8 +38,6 @@
       "route": "native",
       "model": "gpt-5.6-sol",
       "role": "review",
-      "price_in": 0.0,
-      "price_out": 0.0,
       "verified": "2026-09-03 canli",
       "use_for": "Zor problemler, mimari kararlar, son dogrulama. Ailenin en guclusu."
     },
@@ -61,48 +46,31 @@
       "route": "agy",
       "model": "gemini-3.1-pro-high",
       "role": "review",
-      "price_in": 0.0,
-      "price_out": 0.0,
-      "verified": "adaptor test edildi, canli print mode timeout veriyor",
-      "use_for": "GERCEKTEN bagimsiz inceleme: farkli model ailesi, GPT korlugunu yakalar. agy print mode duzelince en degerli worker."
+      "verified": "adaptor test edildi; canli print mode timeout veriyor",
+      "use_for": "GERCEKTEN bagimsiz inceleme: farkli model ailesi, GPT korlugunu yakalar."
     },
     "gemini-flash": {
       "enabled": true,
       "route": "agy",
       "model": "gemini-3.8-flash-medium",
       "role": "review",
-      "price_in": 0.0,
-      "price_out": 0.0,
-      "verified": "adaptor test edildi, canli print mode timeout veriyor",
+      "verified": "adaptor test edildi; canli print mode timeout veriyor",
       "use_for": "Hizli ikinci goz, buyuk cikti ozetleme."
+    },
+    "sonnet": {
+      "enabled": false,
+      "route": "agy",
+      "model": "claude-sonnet-4-6",
+      "role": "review",
+      "use_for": "agy uzerinden Claude Sonnet 4.6. Ucuncu bagimsiz goz gerekirse ac."
     },
     "gpt55": {
       "enabled": false,
       "route": "native",
       "model": "gpt-5.5",
       "role": "implement",
-      "price_in": 0.0,
-      "price_out": 0.0,
       "verified": "2026-09-03 canli",
       "use_for": "Onceki nesil. Regresyon karsilastirmasi gerekirse ac."
-    },
-    "deepseek": {
-      "enabled": false,
-      "route": "openrouter",
-      "model": "deepseek/deepseek-v4-flash-0731",
-      "role": "loop",
-      "price_in": 0.065,
-      "price_out": 0.18,
-      "use_for": "KAPALI: ChatGPT hesabi sadece OpenAI modeli sunar, DeepSeek native codex'ten cagrilamaz. Acmak icin: export OPENROUTER_API_KEY=... sonra enabled=true. 1.3M baglam, en ucuz."
-    },
-    "gemini-or": {
-      "enabled": false,
-      "route": "openrouter",
-      "model": "google/gemini-3.1-pro-preview",
-      "role": "review",
-      "price_in": 2.0,
-      "price_out": 12.0,
-      "use_for": "KAPALI: agy calismazsa OpenRouter uzerinden Gemini yedegi. OPENROUTER_API_KEY ister."
     }
   }
 }

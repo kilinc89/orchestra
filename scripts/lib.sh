@@ -47,29 +47,28 @@ enabled_workers() {
 
 # Bir worker gercekten cagrilabilir mi? Prose degil, kontrol.
 worker_callable() {
-  local worker="$1" route env_key
+  local worker="$1" route engine
   worker_exists "$worker" || { echo "kayitli degil"; return 1; }
   [ "$(wcfg "$worker" enabled)" = "true" ] || { echo "workers.json'da enabled=false"; return 1; }
   route="$(wcfg "$worker" route)"; [ -n "$route" ] || route="$(dcfg route)"
-  local engine; engine="$(rcfg "$route" engine)"
+  engine="$(rcfg "$route" engine)"
   [ -n "$engine" ] || { echo "route '$route' tanimsiz"; return 1; }
   command -v "$engine" >/dev/null 2>&1 || { echo "$engine PATH'te yok"; return 1; }
 
   case "$route" in
     native)
-      [ -f "${CODEX_HOME:-$HOME/.codex}/auth.json" ] || { echo "codex auth.json yok"; return 1; }
+      # codex kendi ChatGPT girisini kullanir; harici anahtar yok.
+      [ -f "${CODEX_HOME:-$HOME/.codex}/auth.json" ] \
+        || { echo "codex girisi yok (codex login)"; return 1; }
       echo "ok"; return 0 ;;
     agy)
-      # agy kendi auth'unu tasir; ek anahtar yok.
-      [ -d "$HOME/.antigravity" ] || { echo "agy yapilandirilmamis (~/.antigravity yok)"; return 1; }
+      # agy kendi auth'unu tasir; harici anahtar yok.
+      [ -d "$HOME/.antigravity" ] \
+        || { echo "agy yapilandirilmamis (~/.antigravity yok)"; return 1; }
       echo "ok"; return 0 ;;
+    *)
+      echo "desteklenmeyen route: $route"; return 1 ;;
   esac
-
-  env_key="$(rcfg "$route" env_key)"
-  [ -n "$env_key" ] || { echo "route '$route' icin env_key tanimsiz"; return 1; }
-  eval "local keyval=\${$env_key:-}"
-  [ -n "${keyval:-}" ] || { echo "$env_key ayarlanmamis"; return 1; }
-  echo "ok"; return 0
 }
 
 now_ms() { python3 -c 'import time;print(int(time.time()*1000))' 2>/dev/null || echo 0; }

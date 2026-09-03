@@ -2,8 +2,9 @@
 # Tek bir worker'i calistirir ve normalize edilmis result.json uretir.
 #
 # Iki engine desteklenir:
-#   codex -> OpenAI Codex CLI (JSONL event akisi)         : openrouter, native
-#   agy   -> Antigravity CLI  (tek JSON nesnesi)          : agy
+#   codex -> OpenAI Codex CLI (JSONL event akisi)  : native  (ChatGPT OAuth)
+#   agy   -> Antigravity CLI  (tek JSON nesnesi)   : agy     (kendi auth'u)
+# Harici saglayici / API key yolu YOK.
 #
 # Tasarim kurallari:
 #   1) Exit koduna GUVENILMEZ. codex, turn.failed'da bile 0 doner; agy timeout'ta
@@ -73,14 +74,6 @@ if [ "$engine" = "codex" ]; then
   [ "$sandbox" = "danger-full-access" ] && args+=(--dangerously-bypass-approvals-and-sandbox)
   [ -n "$work_dir" ] && args+=(-C "$work_dir")
   [ -n "$schema_file" ] && args+=(--output-schema "$schema_file")
-  if [ "$route" != "native" ]; then
-    pid="$(rcfg "$route" provider_id)"
-    args+=(-c "model_provider=$pid"
-           -c "model_providers.$pid.name=\"$pid\""
-           -c "model_providers.$pid.base_url=\"$(rcfg "$route" base_url)\""
-           -c "model_providers.$pid.env_key=\"$(rcfg "$route" env_key)\""
-           -c "model_providers.$pid.wire_api=\"$(rcfg "$route" wire_api)\"")
-  fi
   if ((${#add_dirs[@]})); then for d in "${add_dirs[@]}"; do args+=(--add-dir "$d"); done; fi
   set +e; codex "${args[@]}" - < "$prompt_file" > "$raw" 2> "$errlog"; exit_code=$?; set -e
 
