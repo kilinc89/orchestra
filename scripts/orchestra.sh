@@ -52,7 +52,7 @@ guard_workspace() {
 cmd_workers() {
   printf '%-14s %-8s %-10s %-34s %-9s %s\n' WORKER DURUM ROL MODEL '$/M-in' 'CAGRILABILIR'
   local w
-  for w in $(jq -r '.workers|keys[]' "$ROOT/workers.json"); do
+  for w in $(jq -r '.workers|keys[]' "$(workers_file)"); do
     printf '%-14s %-8s %-10s %-34s %-9s %s\n' \
       "$w" "$(wcfg "$w" enabled)" "$(wcfg "$w" role)" "$(wcfg "$w" model)" \
       "$(wcfg "$w" price_in)" "$(worker_callable "$w" || true)"

@@ -1,6 +1,6 @@
 # Orchestra
 
-Claude orkestre eder. DeepSeek, GPT ve Gemini worker olarak çalışır.
+Claude orkestre eder. GPT-5.6 ailesi ve Gemini worker olarak çalışır.
 
 Claude planlar, işi böler, worker'ları paralel çalıştırır, kanıt toplar, doğrular
 ve kabul kriteri geçene kadar döngüye sokar. Claude worker grafiğinin içinde
@@ -8,18 +8,23 @@ değildir — kod yazmaz, orkestre eder.
 
 ## Worker'lar
 
-| Worker | Model | Yol | Rol | $/M in-out |
-|---|---|---|---|---|
-| `deepseek` | `deepseek/deepseek-v4-flash-0731` | OpenRouter | döngü, yüksek hacim | 0.065 / 0.18 |
-| `gpt` | `openai/gpt-5.6-luna` | OpenRouter | implementasyon | 0.20 / 1.20 |
-| `gemini` | `gemini-3.1-pro-high` | agy | bağımsız inceleme | abonelik |
-| `gemini-flash` | `gemini-3.8-flash-medium` | agy | hızlı kontrol | abonelik |
-| `gpt-native` | `gpt-5.6-luna` | codex OAuth | implementasyon | abonelik |
-| `gemini-or`, `sonnet-agy` | — | yedek | inceleme | — |
+Hepsi `codex` CLI'nin kendi ChatGPT OAuth'u üzerinden — **ek API key yok, token ücreti yok.**
 
-Model ID'leri uydurulmadı: OpenRouter `/api/v1/models` ve `agy models` çıktısından
-2026-09-03'te doğrulandı. `gpt-native` ve yedekler `enabled: false` — çalışır hale
-gelince `workers.json` içinde açılır.
+| Worker | Model | Yol | Rol | Durum |
+|---|---|---|---|---|
+| `luna` | `gpt-5.6-luna` | codex native | döngü, yüksek hacim, hızlı | ✅ canlı doğrulandı |
+| `terra` | `gpt-5.6-terra` | codex native | implementasyon | ✅ canlı doğrulandı |
+| `sol` | `gpt-5.6-sol` | codex native | zor problem, son doğrulama | ✅ canlı doğrulandı |
+| `gemini` | `gemini-3.1-pro-high` | agy | bağımsız inceleme | ⚠️ adaptör hazır, print mode timeout |
+| `gemini-flash` | `gemini-3.8-flash-medium` | agy | hızlı ikinci göz | ⚠️ aynı |
+| `gpt55` | `gpt-5.5` | codex native | regresyon karşılaştırma | kapalı |
+| `deepseek` | `deepseek/deepseek-v4-flash-0731` | OpenRouter | döngü | kapalı — key ister |
+
+Model ID'leri uydurulmadı: `~/.codex/models_cache.json` ve `agy models` çıktısından
+alındı, native olanların **hepsi `codex exec` ile canlı çalıştırılarak** doğrulandı.
+
+ChatGPT hesabı yalnızca OpenAI modelleri sunar; DeepSeek native codex'ten çağrılamaz.
+İstenirse `export OPENROUTER_API_KEY=...` + `workers.json` içinde `enabled: true`.
 
 ## İki engine
 
@@ -39,11 +44,8 @@ Orchestra ikisini tek bir `result.json` şemasına normalize eder.
 ./scripts/orchestra.sh preflight
 ```
 
-OpenRouter worker'ları için tek gereken:
-
-```bash
-export OPENROUTER_API_KEY='...'   # openrouter.ai/keys
-```
+Ek yapılandırma gerekmez — `codex` CLI'nin mevcut girişi kullanılır.
+Gereken tek şey `codex-cli >= 0.153.0` (eski sürüm `gpt-5.6-*` için API 400 döner).
 
 ## Kullanım
 
@@ -56,7 +58,7 @@ scripts/orchestra.sh run --tasks tasks.json --workspace ~/proje \
   --accept "npm test" --max-iter 3
 
 # tek worker'ı bir koşula kadar döndür
-scripts/orchestra.sh loop --worker deepseek \
+scripts/orchestra.sh loop --worker luna \
   --prompt "Tüm testleri geçir" --until "npm test" --max-iter 5
 ```
 
@@ -66,8 +68,8 @@ scripts/orchestra.sh loop --worker deepseek \
 {
   "objective": "Hedef",
   "tasks": [
-    {"id": "impl", "worker": "gpt",      "prompt": "..."},
-    {"id": "rev",  "worker": "gemini",   "prompt": "..."}
+    {"id": "impl", "worker": "terra", "prompt": "..."},
+    {"id": "loop", "worker": "luna",  "prompt": "..."}
   ]
 }
 ```
@@ -136,10 +138,24 @@ tests/test_orchestra.sh
 gerçeklerinin kritik davranışını taklit eder (hata durumunda exit 0, stderr sızıntısı,
 boş çıktı, aralıklı hata). Bu paket geliştirme sırasında 8 gerçek bug yakaladı.
 
+## Canlı doğrulama
+
+Uçtan uca, gerçek worker'larla (stub değil):
+
+| Koşu | Sonuç |
+|---|---|
+| Tek worker: `terra` bozuk `to_roman()`'ı düzeltti | 46s, 1 iterasyon, 12/12 test geçti |
+| Paralel: `terra` + `luna` iki ayrı dosyada | 24.5s duvar saati (ardışık 45s olurdu) |
+| Dosya sahipliği | Worker'lar yalnızca kendi dosyalarına yazdı, çakışma yok |
+| Bağımsız kontrol | Testler orkestratöre değil, elle çalıştırılarak doğrulandı |
+
 ## Bilinen durum
 
-- `agy` print mode bu makinede timeout veriyor (`num_turns: 0`) — adaptör
-  yazıldı ve test edildi, ancak canlı doğrulama yapılamadı.
-- `codex-cli 0.142.0` native `gpt-5.6-luna` için eski (API 400 "requires a newer
-  version"). `codex update` sonrası `gpt-native` açılabilir. OpenRouter yolu
-  bu sorundan etkilenmez.
+- `agy` print mode bu makinede timeout veriyor (`num_turns: 0`, `"timeout waiting
+  for response"`). 4 varyantta denendi: 90s / 300s / `--new-project` / modelsiz
+  minimal çağrı. `agy models` çalışıyor, yani API erişilebilir ama agent turn'ü
+  hiç başlamıyor. Adaptör yazıldı ve stub'la test edildi; **canlı doğrulanmadı.**
+  Düzelene kadar bağımsız inceleme için `sol` kullanılabilir (aynı aile olduğu
+  için gerçek bağımsızlık sağlamaz — bu bilinçli bir taviz).
+- `codex-cli` en az 0.153.0 olmalı. Eski sürüm `gpt-5.6-*` için
+  `"requires a newer version of Codex"` (API 400) döndürür.

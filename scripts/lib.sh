@@ -10,6 +10,9 @@ orc_root() {
   cd -- "$(dirname -- "$src")/.." && pwd -P
 }
 
+# Testler fixture bir kayit dosyasi verebilsin diye override edilebilir.
+workers_file() { printf '%s' "${ORCHESTRA_WORKERS_FILE:-$(orc_root)/workers.json}"; }
+
 log()  { printf '[orchestra] %s\n' "$*" >&2; }
 warn() { printf '[orchestra] UYARI: %s\n' "$*" >&2; }
 die()  { printf '[orchestra] HATA: %s\n' "$*" >&2; exit 1; }
@@ -18,30 +21,28 @@ json_str() { jq -Rn --arg v "$1" '$v'; }
 
 # workers.json'dan alan oku: wcfg <worker> <alan>
 wcfg() {
-  local worker="$1" field="$2" root; root="$(orc_root)"
+  local worker="$1" field="$2"
   jq -r --arg w "$worker" --arg f "$field" \
-    '.workers[$w][$f] | if .==null then "" else . end' "$root/workers.json"
+    '.workers[$w][$f] | if .==null then "" else . end' "$(workers_file)"
 }
 
 rcfg() {
-  local route="$1" field="$2" root; root="$(orc_root)"
+  local route="$1" field="$2"
   jq -r --arg r "$route" --arg f "$field" \
-    '.routes[$r][$f] | if .==null then "" else . end' "$root/workers.json"
+    '.routes[$r][$f] | if .==null then "" else . end' "$(workers_file)"
 }
 
 dcfg() {
-  local field="$1" root; root="$(orc_root)"
-  jq -r --arg f "$field" '.defaults[$f] | if .==null then "" else . end' "$root/workers.json"
+  local field="$1"
+  jq -r --arg f "$field" '.defaults[$f] | if .==null then "" else . end' "$(workers_file)"
 }
 
 worker_exists() {
-  local root; root="$(orc_root)"
-  [ "$(jq -r --arg w "$1" 'has("workers") and (.workers|has($w))' "$root/workers.json")" = "true" ]
+  [ "$(jq -r --arg w "$1" 'has("workers") and (.workers|has($w))' "$(workers_file)")" = "true" ]
 }
 
 enabled_workers() {
-  local root; root="$(orc_root)"
-  jq -r '.workers | to_entries[] | select(.value.enabled) | .key' "$root/workers.json"
+  jq -r '.workers | to_entries[] | select(.value.enabled) | .key' "$(workers_file)"
 }
 
 # Bir worker gercekten cagrilabilir mi? Prose degil, kontrol.

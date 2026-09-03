@@ -1,7 +1,7 @@
 {
-  "$comment": "Worker kaydi. OpenRouter model ID'leri /api/v1/models, agy model ID'leri 'agy models' ile 2026-09-03'te dogrulandi. Fiyatlar USD / 1M token.",
+  "$comment": "Worker kaydi. Native model ID'leri ~/.codex/models_cache.json'dan ve HEPSI codex exec ile CANLI dogrulandi (2026-09-03). agy ID'leri 'agy models' ciktisindan. Fiyatlar USD / 1M token; native = ChatGPT aboneligi, ek token ucreti yok.",
   "defaults": {
-    "route": "openrouter",
+    "route": "native",
     "sandbox": "danger-full-access",
     "timeout_sec": 1800,
     "max_parallel": 4
@@ -15,9 +15,9 @@
       "engine": "codex"
     },
     "native": {
-      "provider_id": null,
-      "note": "codex'in kendi ChatGPT OAuth'u. codex-cli 0.142.0 gpt-5.6-luna icin cok eski (API 400). 'codex update' sonrasi acilir.",
-      "engine": "codex"
+      "engine": "codex",
+      "note": "codex CLI'nin kendi ChatGPT OAuth'u. Ek API key gerekmez. codex-cli >= 0.153.0 sart.",
+      "env_key": null
     },
     "agy": {
       "engine": "agy",
@@ -26,34 +26,35 @@
     }
   },
   "workers": {
-    "deepseek": {
+    "luna": {
       "enabled": true,
-      "route": "openrouter",
-      "model": "deepseek/deepseek-v4-flash-0731",
-      "role": "loop",
-      "context": 1310720,
-      "price_in": 0.065,
-      "price_out": 0.18,
-      "use_for": "Donguler, tekrarli iterasyon, yuksek hacimli mekanik is, toplu refactor. En ucuz ve en genis baglam."
-    },
-    "gpt": {
-      "enabled": true,
-      "route": "openrouter",
-      "model": "openai/gpt-5.6-luna",
-      "role": "implement",
-      "context": 1050000,
-      "price_in": 0.2,
-      "price_out": 1.2,
-      "use_for": "Normal implementasyon, hata ayiklama, entegrasyon."
-    },
-    "gpt-native": {
-      "enabled": false,
       "route": "native",
       "model": "gpt-5.6-luna",
+      "role": "loop",
+      "price_in": 0.0,
+      "price_out": 0.0,
+      "verified": "2026-09-03 canli",
+      "use_for": "Donguler, tekrarli iterasyon, toplu mekanik is, hizli implementasyon. En dusuk gecikme."
+    },
+    "terra": {
+      "enabled": true,
+      "route": "native",
+      "model": "gpt-5.6-terra",
       "role": "implement",
       "price_in": 0.0,
       "price_out": 0.0,
-      "use_for": "ChatGPT aboneligi uzerinden ayni model, ek token ucreti yok. 'codex update' calistirip enabled=true yap."
+      "verified": "2026-09-03 canli",
+      "use_for": "Normal implementasyon, hata ayiklama, entegrasyon. Varsayilan uygulayici."
+    },
+    "sol": {
+      "enabled": true,
+      "route": "native",
+      "model": "gpt-5.6-sol",
+      "role": "review",
+      "price_in": 0.0,
+      "price_out": 0.0,
+      "verified": "2026-09-03 canli",
+      "use_for": "Zor problemler, mimari kararlar, son dogrulama. Ailenin en guclusu."
     },
     "gemini": {
       "enabled": true,
@@ -62,7 +63,8 @@
       "role": "review",
       "price_in": 0.0,
       "price_out": 0.0,
-      "use_for": "Bagimsiz dogrulama ve derin kod incelemesi. Farkli model ailesi oldugu icin GPT/DeepSeek korlugunu yakalar. agy aboneligi kapsaminda, ek ucret yok."
+      "verified": "adaptor test edildi, canli print mode timeout veriyor",
+      "use_for": "GERCEKTEN bagimsiz inceleme: farkli model ailesi, GPT korlugunu yakalar. agy print mode duzelince en degerli worker."
     },
     "gemini-flash": {
       "enabled": true,
@@ -71,7 +73,27 @@
       "role": "review",
       "price_in": 0.0,
       "price_out": 0.0,
-      "use_for": "Hizli sanity-check, buyuk ciktilarin ozetlenmesi, ucuz ikinci goz. OpenRouter'da bulunmayan en yeni Flash surumu."
+      "verified": "adaptor test edildi, canli print mode timeout veriyor",
+      "use_for": "Hizli ikinci goz, buyuk cikti ozetleme."
+    },
+    "gpt55": {
+      "enabled": false,
+      "route": "native",
+      "model": "gpt-5.5",
+      "role": "implement",
+      "price_in": 0.0,
+      "price_out": 0.0,
+      "verified": "2026-09-03 canli",
+      "use_for": "Onceki nesil. Regresyon karsilastirmasi gerekirse ac."
+    },
+    "deepseek": {
+      "enabled": false,
+      "route": "openrouter",
+      "model": "deepseek/deepseek-v4-flash-0731",
+      "role": "loop",
+      "price_in": 0.065,
+      "price_out": 0.18,
+      "use_for": "KAPALI: ChatGPT hesabi sadece OpenAI modeli sunar, DeepSeek native codex'ten cagrilamaz. Acmak icin: export OPENROUTER_API_KEY=... sonra enabled=true. 1.3M baglam, en ucuz."
     },
     "gemini-or": {
       "enabled": false,
@@ -80,16 +102,7 @@
       "role": "review",
       "price_in": 2.0,
       "price_out": 12.0,
-      "use_for": "agy calismazsa OpenRouter uzerinden Gemini yedegi. Pahali, sadece fallback."
-    },
-    "sonnet-agy": {
-      "enabled": false,
-      "route": "agy",
-      "model": "claude-sonnet-4-6",
-      "role": "review",
-      "price_in": 0.0,
-      "price_out": 0.0,
-      "use_for": "agy uzerinden Claude Sonnet 4.6. Ucuncu bir bagimsiz goz gerekirse ac."
+      "use_for": "KAPALI: agy calismazsa OpenRouter uzerinden Gemini yedegi. OPENROUTER_API_KEY ister."
     }
   }
 }

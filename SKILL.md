@@ -1,6 +1,6 @@
 ---
 name: orchestra
-description: Claude'u orkestratör, DeepSeek/GPT/Gemini'yi worker olarak çalıştırır. Görevi böl, worker'ları paralel çalıştır, kanıt topla, doğrula, kabul kriteri geçene kadar döngüye sok. Kullanıcı $orchestra dediğinde veya birden fazla modele iş dağıtmak istediğinde kullan.
+description: Claude'u orkestratör, GPT-5.6 ailesini (luna/terra/sol) ve Gemini'yi worker olarak çalıştırır. Görevi böl, worker'ları paralel çalıştır, kanıt topla, doğrula, kabul kriteri geçene kadar döngüye sok. Kullanıcı $orchestra dediğinde veya birden fazla modele iş dağıtmak istediğinde kullan.
 ---
 
 # Orchestra
@@ -24,14 +24,17 @@ Worker'ın gerçekten hangi modelle çalıştığı `result.json` içindeki
 
 | Rol | Worker | Ne zaman |
 |---|---|---|
-| `loop` | `deepseek` | Döngüler, tekrarlı iterasyon, toplu refactor, yüksek hacimli mekanik iş. En ucuz, 1.3M bağlam. |
-| `implement` | `gpt` | Normal implementasyon, hata ayıklama, entegrasyon. |
-| `review` | `gemini` | Bağımsız doğrulama, derin inceleme. Farklı model ailesi olduğu için diğerlerinin körlüğünü yakalar. |
-| `review` | `gemini-flash` | Hızlı sanity-check, büyük çıktı özetleme, ucuz ikinci göz. |
+| `loop` | `luna` | Döngüler, tekrarlı iterasyon, toplu mekanik iş, hızlı implementasyon. En düşük gecikme. |
+| `implement` | `terra` | Normal implementasyon, hata ayıklama, entegrasyon. Varsayılan uygulayıcı. |
+| `review` | `sol` | Zor problemler, mimari kararlar, son doğrulama. Ailenin en güçlüsü. |
+| `review` | `gemini` / `gemini-flash` | Gerçekten bağımsız inceleme (farklı model ailesi). agy print mode şu an timeout veriyor — `workers` çıktısında `ok` görmeden kullanma. |
+
+Hepsi `codex` CLI'nin mevcut girişini kullanır; API key gerekmez.
 
 Kullanıcı açıkça worker seçtiyse ona uy. Seçmediyse yukarıdaki sınıflandırmayı uygula.
 Bir işi asla tek worker'a hem yaptırıp hem doğrulatma — **uygulayan ile doğrulayan
-farklı model ailesinden olmalı.**
+farklı worker olmalı.** İdeali farklı model ailesidir (`gemini`); o çağrılamıyorsa
+`sol` ile incelet ve raporda "aynı aile, bağımsızlık sınırlı" diye belirt.
 
 ## Akış
 
@@ -76,7 +79,7 @@ döner — bunu başarı gibi raporlama.
 Tek worker'ı bir koşula kadar döndürmek için kısayol:
 
 ```bash
-scripts/orchestra.sh loop --worker deepseek \
+scripts/orchestra.sh loop --worker luna \
   --prompt "Tum testleri gecir" --until "npm test" --max-iter 5
 ```
 

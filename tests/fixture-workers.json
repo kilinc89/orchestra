@@ -1,0 +1,17 @@
+{
+  "$comment": "Sadece test icin. Her route tipini kapsar; uretim workers.json'una dokunmaz.",
+  "defaults": { "route": "native", "sandbox": "danger-full-access", "timeout_sec": 60, "max_parallel": 4 },
+  "routes": {
+    "native":     { "engine": "codex", "env_key": null },
+    "openrouter": { "engine": "codex", "provider_id": "openrouter",
+                    "base_url": "https://openrouter.ai/api/v1",
+                    "env_key": "OPENROUTER_API_KEY", "wire_api": "chat" },
+    "agy":        { "engine": "agy", "env_key": null }
+  },
+  "workers": {
+    "t-native": { "enabled": true,  "route": "native",     "model": "test-native-model", "role": "implement" },
+    "t-or":     { "enabled": true,  "route": "openrouter", "model": "test/or-model",     "role": "loop" },
+    "t-agy":    { "enabled": true,  "route": "agy",        "model": "test-agy-model",    "role": "review" },
+    "t-off":    { "enabled": false, "route": "native",     "model": "test-off-model",    "role": "implement" }
+  }
+}

@@ -11,6 +11,7 @@ chk()  { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (beklenen='$3' gelen='$2
 TMP="$(mktemp -d -t orchestra-test)"; trap 'rm -rf "$TMP"' EXIT
 export PATH="$ROOT/tests/stub:$PATH"
 export OPENROUTER_API_KEY='test-key-not-real'
+export ORCHESTRA_WORKERS_FILE="$ROOT/tests/fixture-workers.json"
 
 echo "== 1. sozdizimi: bash 3.2 (macOS varsayilani) =="
 for f in scripts/lib.sh scripts/dispatch.sh scripts/orchestra.sh install.sh; do
@@ -20,15 +21,15 @@ done
 
 echo "== 2. dispatch: basari yolu =="
 d="$TMP/d1"; echo "test" > "$TMP/p.txt"
-STUB_MODE=ok /bin/bash "$ROOT/scripts/dispatch.sh" --worker gpt --task-id t1 \
+STUB_MODE=ok /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-native --task-id t1 \
   --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
 chk "status=ok" "$(jq -r .status "$d/result.json")" "ok"
 chk "calisan model dogrulandi" "$(jq -r .model_verified "$d/result.json")" "stub/model-x"
-chk "istenen model kaydedildi" "$(jq -r .model_requested "$d/result.json")" "openai/gpt-5.6-luna"
+chk "istenen model kaydedildi" "$(jq -r .model_requested "$d/result.json")" "test-native-model"
 
 echo "== 3. dispatch: turn.failed AMA exit 0 (kritik) =="
 d="$TMP/d2"
-STUB_MODE=failed_exit0 /bin/bash "$ROOT/scripts/dispatch.sh" --worker gpt --task-id t2 \
+STUB_MODE=failed_exit0 /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-native --task-id t2 \
   --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
 rc=$?
 chk "exit 0'a ragmen status=failed" "$(jq -r .status "$d/result.json")" "failed"
@@ -41,24 +42,24 @@ if grep -q "asla last.txt" "$d/stderr.log" 2>/dev/null; then
 
 echo "== 4. dispatch: bos cikti =="
 d="$TMP/d3"
-STUB_MODE=empty /bin/bash "$ROOT/scripts/dispatch.sh" --worker gpt --task-id t3 \
+STUB_MODE=empty /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-native --task-id t3 \
   --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
 chk "status=empty" "$(jq -r .status "$d/result.json")" "empty"
 
 echo "== 5. dispatch: worker cagrilamiyor =="
 d="$TMP/d4"
-STUB_MODE=ok OPENROUTER_API_KEY='' /bin/bash "$ROOT/scripts/dispatch.sh" --worker gpt --task-id t4 \
+STUB_MODE=ok OPENROUTER_API_KEY='' /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-or --task-id t4 \
   --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
 chk "anahtarsiz -> unavailable" "$(jq -r .status "$d/result.json")" "unavailable"
 chk "model uydurulmadi" "$(jq -r '.model_verified//"null"' "$d/result.json")" "null"
 d="$TMP/d5"
-STUB_MODE=ok /bin/bash "$ROOT/scripts/dispatch.sh" --worker gpt-native --task-id t5 \
+STUB_MODE=ok /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-off --task-id t5 \
   --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
 chk "enabled=false -> unavailable" "$(jq -r .status "$d/result.json")" "unavailable"
 
 echo "== 6. git korumasi (tam yetki modu) =="
 ws="$TMP/ws"; mkdir -p "$ws"
-jq -n '{objective:"x",tasks:[{id:"a",worker:"gpt",prompt:"is yap"}]}' > "$TMP/tasks.json"
+jq -n '{objective:"x",tasks:[{id:"a",worker:"t-native",prompt:"is yap"}]}' > "$TMP/tasks.json"
 out="$(STUB_MODE=ok /bin/bash "$ROOT/scripts/orchestra.sh" run --tasks "$TMP/tasks.json" --workspace "$ws" 2>&1)"; rc=$?
 if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q "git deposu degil"; then
   ok "versiyonsuz workspace reddedildi"; else bad "versiyonsuz workspace gecti"; fi
@@ -101,7 +102,7 @@ chk "workers.json gecerli" "$(jq empty "$ROOT/workers.json" >/dev/null 2>&1 && e
 
 echo "== 11. agy engine: basari yolu =="
 d="$TMP/a1"
-STUB_MODE=ok /bin/bash "$ROOT/scripts/dispatch.sh" --worker gemini --task-id a1 \
+STUB_MODE=ok /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-agy --task-id a1 \
   --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
 chk "agy status=ok"           "$(jq -r .status "$d/result.json")" "ok"
 chk "engine=agy kaydedildi"   "$(jq -r .engine "$d/result.json")" "agy"
@@ -111,7 +112,7 @@ if [ -f "$d/usage.json" ]; then ok "token kullanimi saklandi"; else bad "usage.j
 
 echo "== 12. agy engine: status=ERROR =="
 d="$TMP/a2"
-STUB_MODE=failed_exit0 /bin/bash "$ROOT/scripts/dispatch.sh" --worker gemini --task-id a2 \
+STUB_MODE=failed_exit0 /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-agy --task-id a2 \
   --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
 chk "agy ERROR -> failed" "$(jq -r .status "$d/result.json")" "failed"
 if grep -q "asla last.txt" "$d/last.txt" 2>/dev/null; then
@@ -119,14 +120,14 @@ if grep -q "asla last.txt" "$d/last.txt" 2>/dev/null; then
 
 echo "== 13. agy engine: bos yanit =="
 d="$TMP/a3"
-STUB_MODE=empty /bin/bash "$ROOT/scripts/dispatch.sh" --worker gemini --task-id a3 \
+STUB_MODE=empty /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-agy --task-id a3 \
   --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
 chk "agy bos yanit -> empty" "$(jq -r .status "$d/result.json")" "empty"
 
 echo "== 14. karma tur: codex + agy paralel =="
 jq -n '{objective:"karma",tasks:[
-  {id:"impl",worker:"gpt",prompt:"kodu yaz"},
-  {id:"rev", worker:"gemini",prompt:"incele"}]}' > "$TMP/mixed.json"
+  {id:"impl",worker:"t-native",prompt:"kodu yaz"},
+  {id:"rev", worker:"t-agy",prompt:"incele"}]}' > "$TMP/mixed.json"
 ws2="$TMP/ws2"; mkdir -p "$ws2"
 ( cd "$ws2" && git init -q && git config user.email t@t && git config user.name t \
   && echo x > f.txt && git add -A && git commit -qm baseline ) >/dev/null 2>&1
