@@ -135,7 +135,7 @@ ws2="$TMP/ws2"; mkdir -p "$ws2"
 STUB_MODE=ok /bin/bash "$ROOT/scripts/orchestra.sh" run --tasks "$TMP/mixed.json" \
   --workspace "$ws2" --max-iter 1 >/dev/null 2>&1; rc=$?
 chk "karma tur basarili" "$rc" "0"
-rj="$(find "$ws2/.orchestra/runs" -name round.json | tail -1)"
+rj="$(find "$ws2/.orchestra/runs" -name round.json | sort | tail -1)"
 chk "iki engine de kosuldu" "$(jq -r '[.results[].engine]|sort|join(",")' "$rj")" "agy,codex"
 
 
@@ -209,7 +209,7 @@ ws3="$TMP/ws3"; mkdir -p "$ws3"
 STUB_MODE=ok /bin/bash "$ROOT/scripts/orchestra.sh" run --tasks "$TMP/tri.json" \
   --workspace "$ws3" --max-iter 1 >/dev/null 2>&1
 chk "uclu tur basarili" "$?" "0"
-rj3="$(find "$ws3/.orchestra/runs" -name round.json | tail -1)"
+rj3="$(find "$ws3/.orchestra/runs" -name round.json | sort | tail -1)"
 chk "uc engine de kosuldu" "$(jq -r '[.results[].engine]|sort|join(",")' "$rj3")" "agent,agy,codex"
 
 
@@ -222,14 +222,19 @@ wss="$TMP/ws bosluklu"; mkdir -p "$wss"
 STUB_MODE=ok /bin/bash "$ROOT/scripts/orchestra.sh" run --tasks "$TMP/mixed.json" \
   --workspace "$wss" --max-iter 1 >/dev/null 2>&1
 chk "bosluklu yolda run" "$?" "0"
-rjs="$(find "$wss/.orchestra/runs" -name round.json | tail -1)"
+rjs="$(find "$wss/.orchestra/runs" -name round.json | sort | tail -1)"
 chk "sonuclar toplandi (bos degil)" "$(jq -r '.results|length' "$rjs")" "2"
 
 echo "== 24. REGRESYON: bosluklu yolda BASARISIZLIK gizlenmemeli =="
+# Ayri workspace: ayni dizinde birden fazla kosu olunca "find | tail -1" sirasiz
+# davranip onceki turun round.json'unu secebiliyordu (flaky testin sebebi).
+wss2="$TMP/ws2 bosluklu"; mkdir -p "$wss2"
+( cd "$wss2" && git init -q && git config user.email t@t && git config user.name t \
+  && echo x > f.txt && git add -A && git commit -qm baseline ) >/dev/null 2>&1
 STUB_MODE=failed_exit0 /bin/bash "$ROOT/scripts/orchestra.sh" run --tasks "$TMP/mixed.json" \
-  --workspace "$wss" --max-iter 1 >/dev/null 2>&1
+  --workspace "$wss2" --max-iter 1 >/dev/null 2>&1
 chk "basarisiz tur exit 1 dondu" "$?" "1"
-rjs2="$(find "$wss/.orchestra/runs" -name round.json | tail -1)"
+rjs2="$(find "$wss2/.orchestra/runs" -name round.json | sort | tail -1)"
 chk "basarisizlik round.json'da gorunuyor" \
   "$(jq -r '[.results[]|select(.status!="ok")]|length' "$rjs2")" "2"
 

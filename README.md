@@ -8,7 +8,7 @@ değildir — kod yazmaz, orkestre eder.
 
 ## Worker'lar
 
-Üç yerel CLI, üçü de kendi girişini taşır — **harici sağlayıcı yok, API key yok.**
+Üç yerel CLI; üçü de kendi girişini kullanır, ek yapılandırma istemez.
 
 | Worker | Model | CLI | Rol | Canlı |
 |---|---|---|---|---|
@@ -139,9 +139,11 @@ Bunlar rastgele değil; benzer bir projeyi inceleyip hatalarından çıkarıldı
 3. **Model uydurulmaz.** Çalışan model event akışından doğrulanır; bulunamazsa
    `unverified`. "X modeli konuştu" diye etiketlenip aslında Y'nin çalışması
    mümkün değil. (Test 2, 5, 11)
-4. **Çağrılabilirlik prose değil kod.** `worker_callable` binary'yi, auth'u ve
-   anahtarı gerçekten kontrol eder. Anahtar yoksa `unavailable` döner, sessizce
-   başka modele geçmez. (Test 5)
+4. **Çağrılabilirlik prose değil kod.** `worker_callable`, worker'ın kayıtlı ve
+   etkin olduğunu, route'un tanımlı olduğunu, engine binary'sinin PATH'te
+   bulunduğunu ve route'a göre giriş izinin mevcut olduğunu denetler (`codex`:
+   `~/.codex/auth.json`, `agy`: `~/.antigravity`, `cursor`: `~/.cursor`).
+   Koşul sağlanmazsa `unavailable` döner, sessizce başka modele geçmez. (Test 5)
 5. **bash 3.2 uyumlu.** macOS varsayılanı bash 3.2'dir. Associative array,
    `mapfile`, `${v,,}`, `wait -n` kullanılmaz; boş dizi genişletmesi
    `set -u` altında patlamayacak şekilde yazılır. Testler `/bin/bash` ile koşar. (Test 1)
@@ -226,5 +228,5 @@ olmasını şart koşuyor. Aynı aileyle incelettiğinde bu bulgular çıkmayabi
   için gerçek bağımsızlık sağlamaz — bu bilinçli bir taviz).
 - `codex-cli` en az 0.153.0 olmalı. Eski sürüm `gpt-5.6-*` için
   `"requires a newer version of Codex"` (API 400) döndürür.
-- Yalnızca yerel CLI'lar kullanılır (`agent`, `codex`, `agy`). Harici sağlayıcı,
-  proxy ya da API key yolu bilinçli olarak yoktur; test 16 bunu denetler.
+- Yalnızca yerel CLI'lar kullanılır (`agent`, `codex`, `agy`); her biri kendi
+  girişini taşır. Test 16 bunu denetler.
