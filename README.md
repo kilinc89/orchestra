@@ -8,27 +8,37 @@ değildir — kod yazmaz, orkestre eder.
 
 ## Worker'lar
 
-İki CLI, ikisi de kendi girişini taşır — **harici sağlayıcı yok, API key yok.**
+Üç yerel CLI, üçü de kendi girişini taşır — **harici sağlayıcı yok, API key yok.**
 
-| Worker | Model | CLI | Rol | Durum |
+| Worker | Model | CLI | Rol | Canlı |
 |---|---|---|---|---|
-| `luna` | `gpt-5.6-luna` | codex | döngü, yüksek hacim, hızlı | ✅ canlı doğrulandı |
-| `terra` | `gpt-5.6-terra` | codex | implementasyon | ✅ canlı doğrulandı |
-| `sol` | `gpt-5.6-sol` | codex | zor problem, son doğrulama | ✅ canlı doğrulandı |
-| `gemini` | `gemini-3.1-pro-high` | agy | bağımsız inceleme | ⚠️ adaptör hazır, print mode timeout |
-| `gemini-flash` | `gemini-3.8-flash-medium` | agy | hızlı ikinci göz | ⚠️ aynı |
-| `gpt55` | `gpt-5.5` | codex | regresyon karşılaştırma | kapalı |
-| `sonnet` | `claude-sonnet-4-6` | agy | üçüncü bağımsız göz | kapalı |
+| `composer` | `composer-2.5` | agent | döngü, yüksek hacim | ✅ 6s |
+| `codex53` | `gpt-5.3-codex-high` | agent | implementasyon (varsayılan) | ✅ 7s |
+| `luna` | `gpt-5.6-luna-high` | agent | implementasyon (alt) | ✅ 7s |
+| `gemini` | `gemini-3.7-flash-high` | agent | inceleme — Google ailesi | ✅ 9s |
+| `sonnet` | `claude-sonnet-5-thinking-high` | agent | inceleme — Anthropic | ✅ 7s |
+| `opus` | `claude-opus-5-high` | agent | en güçlü inceleyici | ✅ 9s |
+| `sol` | `gpt-5.6-sol-high` | agent | zor problem, son doğrulama | ✅ 8s |
+| `terra-codex` | `gpt-5.6-terra` | codex | implementasyon | ⚠️ backend 404 |
+| `fable`, `grok`, `sol-codex`, `gemini-agy` | — | — | yedek | kapalı |
 
-Model ID'leri uydurulmadı: `~/.codex/models_cache.json` ve `agy models` çıktısından
-alındı; `codex` tarafındakilerin **hepsi canlı çalıştırılarak** doğrulandı.
+Model ID'leri uydurulmadı: `agent --list-models`, `~/.codex/models_cache.json` ve
+`agy models` çıktılarından alındı; `enabled` olanların **hepsi canlı çalıştırılarak**
+doğrulandı. Süreler gerçek ölçüm.
 
-## İki engine
+`fable` bilinçli kapalı: Cursor onu "NO ZDR" olarak işaretliyor (veri saklama
+politikası farklı). `grok` bu hesapta boş yanıt dönüyor.
+
+## Üç engine
 
 | Engine | CLI | Çıktı | Auth |
 |---|---|---|---|
-| `codex` | OpenAI Codex CLI | JSONL event akışı | ChatGPT girişi (`codex login`) |
-| `agy` | Antigravity CLI | tek JSON nesnesi | kendi girişi (`~/.antigravity`) |
+| `agent` | Cursor Agent | tek JSON nesnesi (`is_error`) | `~/.cursor` |
+| `codex` | OpenAI Codex CLI | JSONL event akışı | ChatGPT (`codex login`) |
+| `agy` | Antigravity CLI | tek JSON nesnesi | `~/.antigravity` |
+
+Engine adı = binary adı. Test 21 route/dispatch uyuşmazlığını denetler
+(bu gerçek bir bug'dı: route'ta `agent`, dispatch'te `cursor` yazıyordu).
 
 Her ikisi de gerçek agentic runtime: dosya okur/yazar, komut çalıştırır, test koşar.
 Orchestra ikisini tek bir `result.json` şemasına normalize eder.
@@ -47,15 +57,18 @@ Tek koşul `codex-cli >= 0.153.0`; eski sürüm `gpt-5.6-*` için API 400 döner
 ## Kullanım
 
 ```bash
-# worker durumu — CAGRILABILIR sütunu gerçek kontroldür, iddia değil
+# config kontrolü: kim tanımlı ve yapılandırılmış
 scripts/orchestra.sh workers
+
+# GERÇEK kontrol: her worker'a canlı ping atar, çalışanı kanıtlar (ücret harcar)
+scripts/orchestra.sh doctor
 
 # görev grafiği çalıştır
 scripts/orchestra.sh run --tasks tasks.json --workspace ~/proje \
   --accept "npm test" --max-iter 3
 
 # tek worker'ı bir koşula kadar döndür
-scripts/orchestra.sh loop --worker luna \
+scripts/orchestra.sh loop --worker composer \
   --prompt "Tüm testleri geçir" --until "npm test" --max-iter 5
 ```
 
@@ -65,8 +78,8 @@ scripts/orchestra.sh loop --worker luna \
 {
   "objective": "Hedef",
   "tasks": [
-    {"id": "impl", "worker": "terra", "prompt": "..."},
-    {"id": "loop", "worker": "luna",  "prompt": "..."}
+    {"id": "impl", "worker": "codex53", "prompt": "..."},
+    {"id": "rev",  "worker": "opus",    "prompt": "..."}
   ]
 }
 ```
@@ -130,24 +143,44 @@ Geri alma tek komut: `git checkout .`
 tests/test_orchestra.sh
 ```
 
-46 test. Script'ler sahte bir `codex` ve sahte bir `agy` ile **gerçekten
+60 test. Script'ler sahte bir `codex` ve sahte bir `agy` ile **gerçekten
 çalıştırılır** — "dosya var mı" kontrolü değil, davranış testi. Sahte engine'ler
 gerçeklerinin kritik davranışını taklit eder (hata durumunda exit 0, stderr sızıntısı,
 boş çıktı, aralıklı hata). Bu paket geliştirme sırasında 8 gerçek bug yakaladı.
 
 ## Canlı doğrulama
 
-Uçtan uca, gerçek worker'larla (stub değil):
+Gerçek worker'larla, stub değil:
 
 | Koşu | Sonuç |
 |---|---|
-| Tek worker: `terra` bozuk `to_roman()`'ı düzeltti | 46s, 1 iterasyon, 12/12 test geçti |
-| Paralel: `terra` + `luna` iki ayrı dosyada | 24.5s duvar saati (ardışık 45s olurdu) |
-| Dosya sahipliği | Worker'lar yalnızca kendi dosyalarına yazdı, çakışma yok |
-| Bağımsız kontrol | Testler orkestratöre değil, elle çalıştırılarak doğrulandı |
+| `doctor` — 7 worker'a canlı ping | 5 cursor worker'ı CALISIR (6-9s), 2 codex worker'ı KIRIK (404) |
+| `codex53` bozuk `Account` sınıfını düzeltti | 30s, 1 iterasyon, testler geçti |
+| `gemini` + `opus` paralel bağımsız inceleme | 48.7s duvar saati (ardışık 79s olurdu) |
+| Dosya sahipliği | Worker'lar yalnızca kendi dosyalarına yazdı |
+
+### Bağımsız incelemenin işe yaradığı an
+
+`codex53` implementasyonu yaptı, **testlerin hepsi geçti**. Ardından iki farklı
+model ailesi kodu inceledi ve ikisi de aynı kritik açığı buldu:
+
+```python
+a = Account(100)
+a.withdraw(-100)   # -> 200   para çekerek bakiye ARTIYOR
+```
+
+Uygulayıcı da, test paketi de bunu kaçırmıştı. `opus` ayrıca `float` ile para
+tutmanın yuvarlama hatasını ve kilitsiz okuma-değiştirme-yazma dizisindeki
+race condition'ı raporladı.
+
+Bu yüzden `SKILL.md` uygulayan ile inceleyenin **farklı model ailesinden**
+olmasını şart koşuyor. Aynı aileyle incelettiğinde bu bulgular çıkmayabilir.
 
 ## Bilinen durum
 
+- `codex` native yolu **şu an 404 veriyor**: `wss://chatgpt.com/backend-api/codex/responses`.
+  Aynı sürüm ve token'la daha önce çalıştı; `codex login` ile oturum tazelenmeli.
+  `doctor` bunu KIRIK olarak raporlar — `workers` (yalnızca config kontrolü) `ok` der.
 - `agy` print mode bu makinede timeout veriyor (`num_turns: 0`, `"timeout waiting
   for response"`). 4 varyantta denendi: 90s / 300s / `--new-project` / modelsiz
   minimal çağrı. `agy models` çalışıyor, yani API erişilebilir ama agent turn'ü
@@ -156,5 +189,5 @@ Uçtan uca, gerçek worker'larla (stub değil):
   için gerçek bağımsızlık sağlamaz — bu bilinçli bir taviz).
 - `codex-cli` en az 0.153.0 olmalı. Eski sürüm `gpt-5.6-*` için
   `"requires a newer version of Codex"` (API 400) döndürür.
-- Yalnızca `codex` ve `agy` kullanılır. Harici sağlayıcı, proxy ya da API key
-  yolu bilinçli olarak yoktur; test 16 bunun kodda kalmadığını denetler.
+- Yalnızca yerel CLI'lar kullanılır (`agent`, `codex`, `agy`). Harici sağlayıcı,
+  proxy ya da API key yolu bilinçli olarak yoktur; test 16 bunu denetler.

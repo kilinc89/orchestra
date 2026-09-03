@@ -1,76 +1,121 @@
 {
-  "$comment": "Worker kaydi. Iki engine: codex (native ChatGPT OAuth) ve agy (Antigravity CLI). Harici API key YOK. Native model ID'leri ~/.codex/models_cache.json'dan alindi ve codex exec ile CANLI dogrulandi (2026-09-03); agy ID'leri 'agy models' ciktisindan.",
+  "$comment": "Worker kaydi. Uc engine: cursor (Cursor Agent), codex (ChatGPT OAuth), agy (Antigravity). Harici API key YOK; her CLI kendi girisini tasir. cursor modelleri 'agent --list-models' ciktisindan alinip CANLI dogrulandi (2026-09-03).",
   "defaults": {
-    "route": "native",
+    "route": "cursor",
     "sandbox": "danger-full-access",
     "timeout_sec": 1800,
     "max_parallel": 4
   },
   "routes": {
+    "cursor": {
+      "engine": "agent",
+      "note": "Cursor Agent CLI. Kendi girisi (~/.cursor). Su an en guvenilir yol."
+    },
     "native": {
       "engine": "codex",
-      "note": "codex CLI'nin kendi ChatGPT OAuth'u. Ek API key gerekmez. codex-cli >= 0.153.0 sart."
+      "note": "codex CLI ChatGPT OAuth. codex-cli >= 0.153.0. 2026-09-03: backend 404 veriyor, 'codex login' gerekebilir."
     },
     "agy": {
       "engine": "agy",
-      "note": "Antigravity CLI. Kendi auth'unu tasir, ek API key gerekmez."
+      "note": "Antigravity CLI. Kendi auth'u. 2026-09-03: print mode timeout veriyor."
     }
   },
   "workers": {
+    "composer": {
+      "enabled": true,
+      "route": "cursor",
+      "model": "composer-2.5",
+      "role": "loop",
+      "verified": "2026-09-03 canli 6s",
+      "use_for": "Donguler, tekrarli iterasyon, toplu mekanik is. En hizli."
+    },
+    "codex53": {
+      "enabled": true,
+      "route": "cursor",
+      "model": "gpt-5.3-codex-high",
+      "role": "implement",
+      "verified": "2026-09-03 canli 7s",
+      "use_for": "Varsayilan uygulayici. Kodlamaya ayarli GPT-5.3 Codex."
+    },
     "luna": {
       "enabled": true,
-      "route": "native",
-      "model": "gpt-5.6-luna",
-      "role": "loop",
-      "verified": "2026-09-03 canli",
-      "use_for": "Donguler, tekrarli iterasyon, toplu mekanik is, hizli implementasyon. En dusuk gecikme."
+      "route": "cursor",
+      "model": "gpt-5.6-luna-high",
+      "role": "implement",
+      "verified": "2026-09-03 canli 7s",
+      "use_for": "Alternatif uygulayici, GPT-5.6 Luna 1M baglam."
     },
-    "terra": {
+    "gemini": {
+      "enabled": true,
+      "route": "cursor",
+      "model": "gemini-3.7-flash-high",
+      "role": "review",
+      "verified": "2026-09-03 canli 9s",
+      "use_for": "Bagimsiz inceleme - Google ailesi. Hizli ve ucuz ikinci goz."
+    },
+    "sonnet": {
+      "enabled": true,
+      "route": "cursor",
+      "model": "claude-sonnet-5-thinking-high",
+      "role": "review",
+      "verified": "2026-09-03 canli 7s",
+      "use_for": "Bagimsiz inceleme - Anthropic ailesi. Dengeli derinlik."
+    },
+    "opus": {
+      "enabled": true,
+      "route": "cursor",
+      "model": "claude-opus-5-high",
+      "role": "review",
+      "verified": "2026-09-03 canli 9s",
+      "use_for": "En guclu inceleyici. Mimari karar, zor hata, son adjudikasyon."
+    },
+    "sol": {
+      "enabled": true,
+      "route": "cursor",
+      "model": "gpt-5.6-sol-high",
+      "role": "review",
+      "verified": "2026-09-03 canli 8s",
+      "use_for": "GPT-5.6 ailesinin en guclusu. Zor problem, son dogrulama."
+    },
+    "fable": {
+      "enabled": false,
+      "route": "cursor",
+      "model": "claude-fable-5-thinking-high",
+      "role": "review",
+      "verified": "2026-09-03 canli 13s",
+      "use_for": "Claude Fable 5 1M Thinking. DIKKAT: Cursor bunu \"NO ZDR\" olarak isaretliyor - veri saklama politikasi farkli. Bilincli olarak kapali."
+    },
+    "grok": {
+      "enabled": false,
+      "route": "cursor",
+      "model": "cursor-grok-4.6-high",
+      "role": "review",
+      "verified": "2026-09-03: 42s sonra BOS yanit",
+      "use_for": "xAI ailesi. Bu hesapta yanit vermiyor."
+    },
+    "terra-codex": {
       "enabled": true,
       "route": "native",
       "model": "gpt-5.6-terra",
       "role": "implement",
-      "verified": "2026-09-03 canli",
-      "use_for": "Normal implementasyon, hata ayiklama, entegrasyon. Varsayilan uygulayici."
+      "verified": "2026-09-03 once calisti, sonra backend 404",
+      "use_for": "codex CLI uzerinden implementasyon. 'codex login' sonrasi tercih edilebilir."
     },
-    "sol": {
-      "enabled": true,
+    "sol-codex": {
+      "enabled": false,
       "route": "native",
       "model": "gpt-5.6-sol",
       "role": "review",
-      "verified": "2026-09-03 canli",
-      "use_for": "Zor problemler, mimari kararlar, son dogrulama. Ailenin en guclusu."
+      "verified": "2026-09-03 once calisti, sonra backend 404",
+      "use_for": "codex uzerinden GPT-5.6 Sol."
     },
-    "gemini": {
-      "enabled": true,
+    "gemini-agy": {
+      "enabled": false,
       "route": "agy",
       "model": "gemini-3.1-pro-high",
       "role": "review",
-      "verified": "adaptor test edildi; canli print mode timeout veriyor",
-      "use_for": "GERCEKTEN bagimsiz inceleme: farkli model ailesi, GPT korlugunu yakalar."
-    },
-    "gemini-flash": {
-      "enabled": true,
-      "route": "agy",
-      "model": "gemini-3.8-flash-medium",
-      "role": "review",
-      "verified": "adaptor test edildi; canli print mode timeout veriyor",
-      "use_for": "Hizli ikinci goz, buyuk cikti ozetleme."
-    },
-    "sonnet": {
-      "enabled": false,
-      "route": "agy",
-      "model": "claude-sonnet-4-6",
-      "role": "review",
-      "use_for": "agy uzerinden Claude Sonnet 4.6. Ucuncu bagimsiz goz gerekirse ac."
-    },
-    "gpt55": {
-      "enabled": false,
-      "route": "native",
-      "model": "gpt-5.5",
-      "role": "implement",
-      "verified": "2026-09-03 canli",
-      "use_for": "Onceki nesil. Regresyon karsilastirmasi gerekirse ac."
+      "verified": "print mode timeout (num_turns=0)",
+      "use_for": "agy duzelince Gemini 3.1 Pro. Simdilik cursor'daki 'gemini' kullanilmali."
     }
   }
 }

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Test icin sahte Cursor Agent. Gercek agent gibi TEK JSON nesnesi basar.
+set -u
+[ "${1:-}" = "--list-models" ] && { echo "stub-model - Stub"; exit 0; }
+case "${STUB_MODE:-ok}" in
+  ok)
+    # DIKKAT: is_error BOOLEAN false. jq'da "false // empty" -> empty oldugu icin
+    # bu deger yanlis parse edilirse basarili kosu KIRIK gorunur (gercek bir bug'di).
+    echo '{"type":"result","subtype":"success","is_error":false,"duration_ms":1234,"result":"STUB CURSOR CIKTI","session_id":"cur-stub-1","usage":{"inputTokens":10,"outputTokens":5}}'
+    exit 0 ;;
+  failed_exit0)
+    echo '{"type":"result","subtype":"error","is_error":true,"duration_ms":50,"result":"model reddetti","session_id":"cur-stub-2","usage":{}}'
+    echo "stub cursor stderr: bu satir asla last.txt icine sizmamali" >&2
+    exit 0 ;;
+  empty)
+    echo '{"type":"result","subtype":"success","is_error":false,"duration_ms":100,"result":"","session_id":"cur-stub-3","usage":{}}'
+    exit 0 ;;
+esac

@@ -1,15 +1,55 @@
 {
   "$comment": "Sadece test icin. Iki route tipini de kapsar; uretim workers.json'una dokunmaz.",
-  "defaults": { "route": "native", "sandbox": "danger-full-access", "timeout_sec": 60, "max_parallel": 4 },
+  "defaults": {
+    "route": "native",
+    "sandbox": "danger-full-access",
+    "timeout_sec": 60,
+    "max_parallel": 4
+  },
   "routes": {
-    "native": { "engine": "codex" },
-    "agy":    { "engine": "agy" },
-    "bogus":  { "engine": "engine-that-does-not-exist" }
+    "native": {
+      "engine": "codex"
+    },
+    "agy": {
+      "engine": "agy"
+    },
+    "bogus": {
+      "engine": "engine-that-does-not-exist"
+    },
+    "cursor": {
+      "engine": "agent"
+    }
   },
   "workers": {
-    "t-native": { "enabled": true,  "route": "native", "model": "test-native-model", "role": "implement" },
-    "t-agy":    { "enabled": true,  "route": "agy",    "model": "test-agy-model",    "role": "review" },
-    "t-off":    { "enabled": false, "route": "native", "model": "test-off-model",    "role": "implement" },
-    "t-nobin":  { "enabled": true,  "route": "bogus",  "model": "test-nobin-model",  "role": "implement" }
+    "t-native": {
+      "enabled": true,
+      "route": "native",
+      "model": "test-native-model",
+      "role": "implement"
+    },
+    "t-agy": {
+      "enabled": true,
+      "route": "agy",
+      "model": "test-agy-model",
+      "role": "review"
+    },
+    "t-off": {
+      "enabled": false,
+      "route": "native",
+      "model": "test-off-model",
+      "role": "implement"
+    },
+    "t-nobin": {
+      "enabled": true,
+      "route": "bogus",
+      "model": "test-nobin-model",
+      "role": "implement"
+    },
+    "t-cursor": {
+      "enabled": true,
+      "route": "cursor",
+      "model": "test-cursor-model",
+      "role": "review"
+    }
   }
 }

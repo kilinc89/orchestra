@@ -11,8 +11,12 @@ usage() {
 Kullanim:
   orchestra.sh preflight [--workspace DIR]
   orchestra.sh workers
+  orchestra.sh doctor [--worker W]
   orchestra.sh run   --tasks FILE [--workspace DIR] [--max-iter N] [--accept CMD] [--force]
   orchestra.sh loop  --worker W --prompt TEXT --until CMD [--workspace DIR] [--max-iter N] [--force]
+
+  doctor         her worker'a GERCEK bir ping atar. 'workers' yalnizca config
+                 kontrolu yapar; doctor calisan yolu kanitlar. Ucret harcar.
 
   --tasks FILE   gorev grafigi JSON: {"objective":"...","tasks":[{"id","worker","prompt","cd"?}]}
   --accept CMD   kabul kriteri. Cikis 0 ise is bitti; degilse dongu bir tur daha doner.
@@ -112,6 +116,44 @@ run_round() {
   if ((${#pids[@]})); then for p in "${pids[@]}"; do wait "$p" 2>/dev/null || true; done; fi
 
   jq -s '{results:.}' $(find "$round_dir" -name result.json | sort) > "$round_dir/round.json" 2>/dev/null || echo '{"results":[]}' > "$round_dir/round.json"
+}
+
+# workers yalnizca config'e bakar. doctor gercekten cagirir: "ok" iddiasi degil kanit.
+cmd_doctor() {
+  local only=''
+  while (($#)); do
+    case "$1" in
+      --worker) only="${2:-}"; shift 2 ;;
+      *) die "doctor: bilinmeyen secenek: $1" ;;
+    esac
+  done
+  local tmp; tmp="$(mktemp -d -t orchestra-doctor)"
+  printf '%s' 'Reply with exactly one word: PONG' > "$tmp/p.txt"
+  printf '%-14s %-8s %-10s %s\n' WORKER SONUC SURE DETAY
+  local w rc st dur err
+  for w in $(enabled_workers); do
+    [ -z "$only" ] || [ "$only" = "$w" ] || continue
+    local why; why="$(worker_callable "$w" 2>/dev/null || true)"
+    if [ "$why" != "ok" ]; then
+      printf '%-14s %-8s %-10s %s\n' "$w" "ATLANDI" "-" "$why"
+      continue
+    fi
+    mkdir -p "$tmp/$w"
+    set +e
+    "$ROOT/scripts/dispatch.sh" --worker "$w" --task-id "$w" \
+      --prompt-file "$tmp/p.txt" --out-dir "$tmp/$w" >/dev/null 2>&1
+    rc=$?
+    set -e
+    st="$(jq -r .status "$tmp/$w/result.json" 2>/dev/null || echo '?')"
+    dur="$(jq -r '(.duration_ms/1000|floor|tostring)+"s"' "$tmp/$w/result.json" 2>/dev/null || echo '?')"
+    err="$(jq -r '.error // ""' "$tmp/$w/result.json" 2>/dev/null | head -c 70)"
+    if [ "$st" = "ok" ]; then
+      printf '%-14s %-8s %-10s %s\n' "$w" "CALISIR" "$dur" "$(head -c 30 "$tmp/$w/last.txt" 2>/dev/null | tr -d '\n')"
+    else
+      printf '%-14s %-8s %-10s %s\n' "$w" "KIRIK" "$dur" "$err"
+    fi
+  done
+  rm -rf "$tmp"
 }
 
 cmd_run() {
@@ -220,6 +262,7 @@ sub="${1:-}"; [ $# -gt 0 ] && shift || true
 case "$sub" in
   preflight) cmd_preflight "${1:-$PWD}" ;;
   workers)   cmd_workers ;;
+  doctor)    cmd_doctor "$@" ;;
   run)       cmd_run "$@" ;;
   loop)      cmd_loop "$@" ;;
   ''|--help|-h) usage ;;

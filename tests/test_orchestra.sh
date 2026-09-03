@@ -149,16 +149,68 @@ if grep -qxF '.orchestra/' "$ws2/.git/info/exclude" 2>/dev/null; then
   ok "exclude .git/info/exclude'a yazildi (kullanici .gitignore'u temiz)"; else bad "exclude yazilmadi"; fi
 
 
-echo "== 16. sadece codex + agy: harici saglayici kalintisi yok =="
+echo "== 16. yalnizca yerel CLI: harici saglayici kalintisi yok =="
 if grep -rIn --exclude-dir=.git --exclude-dir=tests --exclude-dir=.orchestra \
      -iE 'openrouter|deepseek|api[_-]?key' "$ROOT" 2>/dev/null | grep -v README.md | grep -q .; then
   bad "kodda/konfigde harici saglayici izi var"; else ok "kodda harici saglayici/anahtar izi yok"; fi
 routes="$(jq -r '.routes|keys|sort|join(",")' "$ROOT/workers.json")"
-chk "sadece iki route tanimli" "$routes" "agy,native"
+chk "uc route tanimli" "$routes" "agy,cursor,native"
 engines="$(jq -r '[.routes[].engine]|sort|unique|join(",")' "$ROOT/workers.json")"
-chk "sadece codex ve agy engine" "$engines" "agy,codex"
+chk "sadece yerel CLI engine'leri" "$engines" "agent,agy,codex"
 if jq -e '[.routes[]|select(has("env_key"))]|length==0' "$ROOT/workers.json" >/dev/null; then
   ok "hicbir route env_key istemiyor"; else bad "bir route hala env_key istiyor"; fi
+
+
+echo "== 17. cursor engine: basari yolu =="
+d="$TMP/c1"
+STUB_MODE=ok /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-cursor --task-id c1 \
+  --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
+chk "cursor status=ok"        "$(jq -r .status "$d/result.json")" "ok"
+chk "engine=agent kaydedildi" "$(jq -r .engine "$d/result.json")" "agent"
+chk "session_id yakalandi"    "$(jq -r .thread_id "$d/result.json")" "cur-stub-1"
+chk "cursor modeli dogrulanamaz -> unverified" "$(jq -r .model_verified "$d/result.json")" "unverified"
+
+echo "== 18. REGRESYON: is_error=false (boolean) basari sayilmali =="
+# jq'da "false // empty" -> empty. Bu tuzak gercek bir bug'a yol acmisti:
+# calisan her cursor worker'i KIRIK gorunuyordu.
+if grep -q 'is_error // empty' "$ROOT/scripts/dispatch.sh"; then
+  bad "is_error hala falsy-yutan '// empty' ile okunuyor"; else ok "is_error falsy-guvenli okunuyor"; fi
+chk "is_error=false -> ok" "$(jq -r .status "$d/result.json")" "ok"
+
+echo "== 19. cursor engine: is_error=true =="
+d="$TMP/c2"
+STUB_MODE=failed_exit0 /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-cursor --task-id c2 \
+  --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
+chk "is_error=true -> failed" "$(jq -r .status "$d/result.json")" "failed"
+if grep -q "asla last.txt" "$d/last.txt" 2>/dev/null; then
+  bad "cursor stderr last.txt'e sizdi"; else ok "cursor stderr ayrildi"; fi
+
+echo "== 20. cursor engine: bos yanit =="
+d="$TMP/c3"
+STUB_MODE=empty /bin/bash "$ROOT/scripts/dispatch.sh" --worker t-cursor --task-id c3 \
+  --prompt-file "$TMP/p.txt" --out-dir "$d" >/dev/null 2>&1
+chk "cursor bos yanit -> empty" "$(jq -r .status "$d/result.json")" "empty"
+
+echo "== 21. engine adi = binary adi (uc engine) =="
+for e in $(jq -r '.routes[].engine' "$ROOT/workers.json" | sort -u); do
+  if grep -q "\"\$engine\" = \"$e\"" "$ROOT/scripts/dispatch.sh"; then
+    ok "dispatch '$e' engine'ini taniyor"
+  else bad "dispatch '$e' engine'ini TANIMIYOR (route/dispatch uyusmazligi)"; fi
+done
+
+echo "== 22. uc engine ayni turda paralel =="
+jq -n '{objective:"uclu",tasks:[
+  {id:"a",worker:"t-native",prompt:"x"},
+  {id:"b",worker:"t-agy",prompt:"y"},
+  {id:"c",worker:"t-cursor",prompt:"z"}]}' > "$TMP/tri.json"
+ws3="$TMP/ws3"; mkdir -p "$ws3"
+( cd "$ws3" && git init -q && git config user.email t@t && git config user.name t \
+  && echo x > f.txt && git add -A && git commit -qm baseline ) >/dev/null 2>&1
+STUB_MODE=ok /bin/bash "$ROOT/scripts/orchestra.sh" run --tasks "$TMP/tri.json" \
+  --workspace "$ws3" --max-iter 1 >/dev/null 2>&1
+chk "uclu tur basarili" "$?" "0"
+rj3="$(find "$ws3/.orchestra/runs" -name round.json | tail -1)"
+chk "uc engine de kosuldu" "$(jq -r '[.results[].engine]|sort|join(",")' "$rj3")" "agent,agy,codex"
 
 echo
 if [ "$FAIL" -eq 0 ]; then echo "PASS: $PASS test gecti, 0 basarisiz"; exit 0

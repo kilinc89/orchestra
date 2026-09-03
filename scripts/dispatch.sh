@@ -2,9 +2,10 @@
 # Tek bir worker'i calistirir ve normalize edilmis result.json uretir.
 #
 # Iki engine desteklenir:
-#   codex -> OpenAI Codex CLI (JSONL event akisi)  : native  (ChatGPT OAuth)
-#   agy   -> Antigravity CLI  (tek JSON nesnesi)   : agy     (kendi auth'u)
-# Harici saglayici / API key yolu YOK.
+#   codex  -> OpenAI Codex CLI  (JSONL event akisi) : native (ChatGPT OAuth)
+#   agy    -> Antigravity CLI   (tek JSON nesnesi)  : agy    (kendi auth'u)
+#   agent  -> Cursor Agent CLI  (tek JSON nesnesi)  : cursor (kendi auth'u)
+# Harici saglayici / API key yolu YOK; her CLI kendi girisini tasir.
 #
 # Tasarim kurallari:
 #   1) Exit koduna GUVENILMEZ. codex, turn.failed'da bile 0 doner; agy timeout'ta
@@ -107,6 +108,31 @@ elif [ "$engine" = "agy" ]; then
   [ -n "$fail_msg" ] || { [ "$agy_status" = "ERROR" ] && fail_msg="agy status=ERROR"; }
   # token kullanimini sakla
   jq -c '.usage//{}' "$raw" > "$out_dir/usage.json" 2>/dev/null || true
+elif [ "$engine" = "agent" ]; then
+  # Cursor Agent: prompt argüman, calisma dizini --workspace ile verilir.
+  args=(--print "$(cat "$prompt_file")" --model "$model" --output-format json)
+  [ "$sandbox" = "danger-full-access" ] && args+=(--force --trust --sandbox disabled)
+  [ -n "$work_dir" ] && args+=(--workspace "$work_dir")
+  if ((${#add_dirs[@]})); then for d in "${add_dirs[@]}"; do args+=(--add-dir "$d"); done; fi
+  set +e; agent "${args[@]}" > "$raw" 2> "$errlog"; exit_code=$?; set -e
+
+  # DIKKAT: jq'da  false // empty  -> empty. is_error=false (yani BASARI) kaybolurdu.
+  is_err="$(jq -r '.is_error | if .==null then "" else tostring end' "$raw" 2>/dev/null || echo '')"
+  subtype="$(jq -r '.subtype // ""' "$raw" 2>/dev/null || echo '')"
+  thread_id="$(jq -r '.session_id // ""' "$raw" 2>/dev/null || echo '')"
+  printf '%s' "$(jq -r '.result // ""' "$raw" 2>/dev/null || true)" > "$last"
+  # Cursor JSON'unda calisan model geri donmuyor -> dogrulanamaz, uydurulmaz.
+  model_verified=''
+  fail_msg=''
+  completed=0
+  if [ "$is_err" = "false" ]; then
+    completed=1
+  elif [ "$is_err" = "true" ]; then
+    fail_msg="$(jq -r '.result // .error // "cursor is_error=true"' "$raw" 2>/dev/null || echo 'cursor hatasi')"
+  else
+    fail_msg="cursor yaniti cozumlenemedi (subtype='$subtype')"
+  fi
+  jq -c '.usage // {}' "$raw" > "$out_dir/usage.json" 2>/dev/null || true
 else
   emit_result "unavailable" "" "bilinmeyen engine: $engine" null 0 0 ""
   die "dispatch: bilinmeyen engine '$engine'"

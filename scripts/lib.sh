@@ -66,6 +66,11 @@ worker_callable() {
       [ -d "$HOME/.antigravity" ] \
         || { echo "agy yapilandirilmamis (~/.antigravity yok)"; return 1; }
       echo "ok"; return 0 ;;
+    cursor)
+      # Cursor Agent (binary adi: agent) kendi girisini tasir; harici anahtar yok.
+      [ -d "$HOME/.cursor" ] \
+        || { echo "cursor yapilandirilmamis (~/.cursor yok)"; return 1; }
+      echo "ok"; return 0 ;;
     *)
       echo "desteklenmeyen route: $route"; return 1 ;;
   esac
