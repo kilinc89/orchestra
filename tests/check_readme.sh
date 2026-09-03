@@ -77,9 +77,19 @@ case "$n_eng" in
 esac
 
 # 7) kaldirilmis seyler README'de KALMAMALI
-for dead in OPENROUTER_API_KEY deepseek-v4-flash openrouter.ai; do
+for dead in OPENROUTER_API_KEY deepseek-v4-flash openrouter.ai OpenRouter DeepSeek; do
   grep -qF -- "$dead" "$R" && fails+=("kaldirilmis oge hala README'de: $dead")
 done
+
+# 7b) harici saglayici kalkinca anlamsizlasan "API key yok" turu ifadeler de gitmeli
+while IFS= read -r resid; do
+  fails+=("harici saglayici kalintisi ifade: $resid")
+done < <(grep -niE 'API key|harici sağlayıcı|harici saglayici|proxy' "$R" | cut -c1-70)
+
+# 7c) Tasarim kararlari, worker_callable'in GERCEKTE kontrol ettigini anlatmali.
+# Anahtar kontrolu OpenRouter ile birlikte kaldirildi; README hala anlatiyorsa yanlis.
+grep -qiE 'anahtar[ıi]? gerçekten kontrol|Anahtar yoksa' "$R" \
+  && fails+=("README kaldirilmis anahtar kontrolunu anlatiyor (worker_callable artik binary + giris dosyasi bakar)")
 
 if ((${#fails[@]})); then
   printf 'README DENETIMI BASARISIZ (%d):\n' "${#fails[@]}"
