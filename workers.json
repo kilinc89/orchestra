@@ -1,5 +1,5 @@
 {
-  "$comment": "Worker kaydi. Uc engine: cursor (Cursor Agent), codex (ChatGPT OAuth), agy (Antigravity). Harici API key YOK; her CLI kendi girisini tasir. cursor modelleri 'agent --list-models' ciktisindan alinip CANLI dogrulandi (2026-09-03).",
+  "$comment": "Worker kaydi. Uc engine: cursor (Cursor Agent), codex (ChatGPT OAuth), agy (Antigravity). Harici API key YOK; her CLI kendi girisini tasir. 2026-09-06: agy 1.1.27 print mode DUZELDI, gemini-agy acildi ve canli dogrulandi. Ayni tarihte Cursor kotasi doldu -> Composer disindaki cursor worker'lari ActionRequiredError veriyor.",
   "defaults": {
     "route": "cursor",
     "sandbox": "danger-full-access",
@@ -17,7 +17,7 @@
     },
     "agy": {
       "engine": "agy",
-      "note": "Antigravity CLI. Kendi auth'u. 2026-09-03: print mode timeout veriyor."
+      "note": "Antigravity CLI. Kendi auth'u. 2026-09-06: agy 1.1.27 ile print mode calisiyor (canli 1.5s). Tek canli Gemini yolu; standalone 'gemini' CLI'yi Google kapatti (IneligibleTierError -> Antigravity'ye gecis)."
     }
   },
   "workers": {
@@ -34,7 +34,7 @@
       "route": "cursor",
       "model": "gpt-5.3-codex-high",
       "role": "implement",
-      "verified": "2026-09-03 canli 7s",
+      "verified": "2026-09-03 canli 7s | 2026-09-06 KIRIK: Cursor kotasi (ActionRequiredError)",
       "use_for": "Varsayilan uygulayici. Kodlamaya ayarli GPT-5.3 Codex."
     },
     "luna": {
@@ -42,7 +42,7 @@
       "route": "cursor",
       "model": "gpt-5.6-luna-high",
       "role": "implement",
-      "verified": "2026-09-03 canli 7s",
+      "verified": "2026-09-03 canli 7s | 2026-09-06 KIRIK: Cursor kotasi (ActionRequiredError)",
       "use_for": "Alternatif uygulayici, GPT-5.6 Luna 1M baglam."
     },
     "gemini": {
@@ -50,7 +50,7 @@
       "route": "cursor",
       "model": "gemini-3.7-flash-high",
       "role": "review",
-      "verified": "2026-09-03 canli 9s",
+      "verified": "2026-09-03 canli 9s | 2026-09-06 KIRIK: Cursor kotasi (ActionRequiredError)",
       "use_for": "Bagimsiz inceleme - Google ailesi. Hizli ve ucuz ikinci goz."
     },
     "sonnet": {
@@ -58,7 +58,7 @@
       "route": "cursor",
       "model": "claude-sonnet-5-thinking-high",
       "role": "review",
-      "verified": "2026-09-03 canli 7s",
+      "verified": "2026-09-03 canli 7s | 2026-09-06 KIRIK: Cursor kotasi (ActionRequiredError)",
       "use_for": "Bagimsiz inceleme - Anthropic ailesi. Dengeli derinlik."
     },
     "opus": {
@@ -66,7 +66,7 @@
       "route": "cursor",
       "model": "claude-opus-5-high",
       "role": "review",
-      "verified": "2026-09-03 canli 9s",
+      "verified": "2026-09-03 canli 9s | 2026-09-06 KIRIK: Cursor kotasi (ActionRequiredError)",
       "use_for": "En guclu inceleyici. Mimari karar, zor hata, son adjudikasyon."
     },
     "sol": {
@@ -74,7 +74,7 @@
       "route": "cursor",
       "model": "gpt-5.6-sol-high",
       "role": "review",
-      "verified": "2026-09-03 canli 8s",
+      "verified": "2026-09-03 canli 8s | 2026-09-06 KIRIK: Cursor kotasi (ActionRequiredError)",
       "use_for": "GPT-5.6 ailesinin en guclusu. Zor problem, son dogrulama."
     },
     "fable": {
@@ -110,12 +110,12 @@
       "use_for": "codex uzerinden GPT-5.6 Sol."
     },
     "gemini-agy": {
-      "enabled": false,
+      "enabled": true,
       "route": "agy",
-      "model": "gemini-3.1-pro-high",
+      "model": "gemini-3.8-flash-high",
       "role": "review",
-      "verified": "print mode timeout (num_turns=0)",
-      "use_for": "agy duzelince Gemini 3.1 Pro. Simdilik cursor'daki 'gemini' kullanilmali."
+      "verified": "2026-09-06 canli 1.5s (agy 1.1.27, status=SUCCESS)",
+      "use_for": "Bagimsiz inceleme - Google ailesi. Antigravity uzerinden Gemini 3.8 Flash. Cursor kotasi dolu oldugu icin su an TEK calisan Gemini yolu."
     }
   }
 }

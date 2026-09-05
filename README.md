@@ -12,15 +12,38 @@ değildir — kod yazmaz, orkestre eder.
 
 | Worker | Model | CLI | Rol | Canlı |
 |---|---|---|---|---|
+| `gemini-agy` | `gemini-3.8-flash-high` | agy | inceleme — Google ailesi | ✅ 1.5s |
 | `composer` | `composer-2.5` | agent | döngü, yüksek hacim | ✅ 6s |
-| `codex53` | `gpt-5.3-codex-high` | agent | implementasyon (varsayılan) | ✅ 7s |
-| `luna` | `gpt-5.6-luna-high` | agent | implementasyon (alt) | ✅ 7s |
-| `gemini` | `gemini-3.7-flash-high` | agent | inceleme — Google ailesi | ✅ 9s |
-| `sonnet` | `claude-sonnet-5-thinking-high` | agent | inceleme — Anthropic | ✅ 7s |
-| `opus` | `claude-opus-5-high` | agent | en güçlü inceleyici | ✅ 9s |
-| `sol` | `gpt-5.6-sol-high` | agent | zor problem, son doğrulama | ✅ 8s |
+| `codex53` | `gpt-5.3-codex-high` | agent | implementasyon (varsayılan) | ⚠️ Cursor kotası |
+| `luna` | `gpt-5.6-luna-high` | agent | implementasyon (alt) | ⚠️ Cursor kotası |
+| `gemini` | `gemini-3.7-flash-high` | agent | inceleme — Google ailesi | ⚠️ Cursor kotası |
+| `sonnet` | `claude-sonnet-5-thinking-high` | agent | inceleme — Anthropic | ⚠️ Cursor kotası |
+| `opus` | `claude-opus-5-high` | agent | en güçlü inceleyici | ⚠️ Cursor kotası |
+| `sol` | `gpt-5.6-sol-high` | agent | zor problem, son doğrulama | ⚠️ Cursor kotası |
 | `terra-codex` | `gpt-5.6-terra` | codex | implementasyon | ⚠️ backend 404 |
-| `fable`, `grok`, `sol-codex`, `gemini-agy` | — | — | yedek | kapalı |
+| `fable`, `grok`, `sol-codex` | — | — | yedek | kapalı |
+
+### Gemini alt ajanı
+
+Görev grafiği kurmadan hızlı bir ikinci göz gerektiğinde `.claude/agents/gemini.md`
+alt ajanı kullanılır:
+
+```
+Agent(subagent_type: "gemini", prompt: "Şu diff'i güvenlik açısından incele: ...")
+```
+
+Alt ajan bir boru hattıdır: bağlamı toplar, `agy --print ... --model
+gemini-3.8-flash-high --output-format json` çağırır ve `.response` alanını
+kısaltmadan geri verir. Alt ajanın **kendisi bir Claude modelidir**; Gemini yalnızca
+o `agy` çağrısında devreye girer — bu yüzden Gemini'ye hiç gitmeden üretilmiş bir
+cevabı "Gemini dedi ki" diye etiketlemez. `agy` JSON'u çalışan modeli döndürmediği
+için model **istendi** denir, **doğrulandı** denmez.
+
+Varsayılan çağrıda `--dangerously-skip-permissions` yoktur: bu bir inceleme yoludur,
+yazma yolu değil.
+
+`install.sh` bu tanımı `~/.claude/agents/` altına kopyalar, böylece her projeden
+çağrılabilir. `--no-agents` bunu atlar.
 
 Model ID'leri uydurulmadı: `agent --list-models`, `~/.codex/models_cache.json` ve
 `agy models` çıktılarından alındı; `enabled` olanların **hepsi canlı çalıştırılarak**
@@ -28,6 +51,14 @@ doğrulandı. Süreler gerçek ölçüm.
 
 `fable` bilinçli kapalı: Cursor onu "NO ZDR" olarak işaretliyor (veri saklama
 politikası farklı). `grok` bu hesapta boş yanıt dönüyor.
+
+**2026-09-06 durumu.** Cursor hesabının kotası doldu; `composer-2.5` dışındaki her
+cursor worker'ı `ActionRequiredError: You're out of usage` veriyor. Aynı gün
+Antigravity CLI 1.1.27 ile `agy` print mode düzeldi (eskiden `num_turns=0` ile
+timeout veriyordu), böylece `gemini-agy` açıldı ve canlı doğrulandı — şu an
+çalışan tek Google yolu odur. Homebrew'daki bağımsız `gemini` CLI'ı ise Google
+kapattı: `IneligibleTierError — This client is no longer supported... migrate to
+the Antigravity suite`. Yani Gemini'ye tek giriş `agy`.
 
 ## Üç engine
 
@@ -47,10 +78,13 @@ Orchestra üçünü tek bir `result.json` şemasına normalize eder.
 
 ```text
 .
+├── .claude
+│   └── agents
+│       └── gemini.md           Gemini alt ajanının tanımıdır; işi `agy` üzerinden Gemini'ye devreder.
 ├── .gitignore                  .orchestra/ ve yerel geçici dosyaları gitten dışlar.
 ├── README.md                   Projeyi, tasarım kararlarını ve canlı durum notlarını belgeler.
 ├── SKILL.md                    Claude Code için Orchestra kullanım protokolü ve zorunlu kuralları tanımlar.
-├── install.sh                  Skill dosyalarını ~/.claude/skills/orchestra altına kurar.
+├── install.sh                  Skill dosyalarını ~/.claude/skills/orchestra, alt ajanları ~/.claude/agents altına kurar.
 ├── scripts
 │   ├── dispatch.sh             Tek worker çağrısı yapar ve sonucu normalize `result.json` olarak yazar.
 │   ├── lib.sh                  Ortak yardımcı fonksiyonlar ve worker çağrılabilirlik kontrollerini tutar.
@@ -193,7 +227,9 @@ Gerçek worker'larla, stub değil:
 
 | Koşu | Sonuç |
 |---|---|
-| `doctor` — 8 worker'a canlı ping | 7 cursor worker'ı ÇALIŞIR (6-9s), 1 codex worker'ı KIRIK (404) |
+| `doctor` — 9 worker'a canlı ping (2026-09-03) | 7 cursor worker'ı ÇALIŞIR (6-9s), 1 codex worker'ı KIRIK (404) |
+| `doctor --worker gemini-agy` (2026-09-06) | ÇALIŞIR, 6s, yanıt `PONG` |
+| `doctor --worker gemini` (2026-09-06) | KIRIK — Cursor kotası tükendi |
 | `codex53` bozuk `Account` sınıfını düzeltti | 30s, 1 iterasyon, testler geçti |
 | `gemini` + `opus` paralel bağımsız inceleme | 48.7s duvar saati (ardışık 79s olurdu) |
 | Dosya sahipliği | Worker'lar yalnızca kendi dosyalarına yazdı |

@@ -26,7 +26,7 @@ Worker'ın gerçekten hangi modelle çalıştığı `result.json` içindeki
 |---|---|---|
 | `loop` | `composer` | Döngüler, tekrarlı iterasyon, toplu mekanik iş. En hızlı. |
 | `implement` | `codex53` | Varsayılan uygulayıcı. Alternatif: `luna`. |
-| `review` | `gemini` | Hızlı bağımsız inceleme — Google ailesi. |
+| `review` | `gemini-agy` | Hızlı bağımsız inceleme — Google ailesi (Antigravity, Gemini 3.8 Flash). |
 | `review` | `sonnet` | Dengeli derin inceleme — Anthropic ailesi. |
 | `review` | `opus` | En güçlü inceleyici. Mimari karar, zor hata, son adjudikasyon. |
 | `review` | `sol` | GPT-5.6 ailesinin en güçlüsü. |
@@ -34,12 +34,17 @@ Worker'ın gerçekten hangi modelle çalıştığı `result.json` içindeki
 Üç engine vardır: `agent` (Cursor), `codex` (ChatGPT), `agy` (Antigravity).
 Hepsi kendi girişini taşır — harici sağlayıcı ya da anahtar yoktur.
 
+Gemini için ayrıca bir **alt ajan** vardır: `Agent(subagent_type: "gemini")`.
+Tek bir soruyu `agy` üzerinden Gemini'ye devreder ve yanıtı olduğu gibi geri getirir —
+görev grafiği kurmadan hızlı ikinci göz gerektiğinde bunu kullan. Tanım:
+`.claude/agents/gemini.md`; `install.sh` bunu `~/.claude/agents/` altına kurar.
+
 **`workers` yalnızca config'e bakar; `doctor` gerçekten çağırır.** Bir worker'ın
 çalıştığını iddia etmeden önce `doctor` çıktısına bak — `workers` `ok` derken
 `doctor` `KIRIK` diyebilir (backend arızası bunu böyle gösterir).
 
 Bir işi asla tek worker'a hem yaptırıp hem doğrulatma — **uygulayan ile doğrulayan
-farklı model ailesinden olmalı.** `codex53` uygularsa `gemini` (Google) veya
+farklı model ailesinden olmalı.** `codex53` uygularsa `gemini-agy` (Google) veya
 `opus`/`sonnet` (Anthropic) incelesin. Bu boş bir kural değil: gerçek bir koşuda
 tüm testler geçtiği hâlde iki bağımsız aile `withdraw(-100)` ile bakiyenin arttığı
 güvenlik açığını yakaladı; uygulayıcı ve test paketi kaçırmıştı.
