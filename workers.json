@@ -6,6 +6,50 @@
     "timeout_sec": 1800,
     "max_parallel": 4
   },
+  "jev": {
+    "$comment": "Yonlendirici: TypeSafe Jev (System One). Worker DEGIL; 'orchestra.sh route' hangi worker'in hangi isi alacagini sorar. min_confidence havuz basina: claude=Orchestra, all=OrchestraG. Anahtar Keychain'de (orchestra-typesafe), bu dosyada DEGIL.",
+    "url": "https://api.typesafe.ai/v1/systemone",
+    "model": "jev-latest",
+    "min_confidence": {
+      "claude": 0.5,
+      "all": 0.4
+    },
+    "timeout_sec": 30
+  },
+  "health": {
+    "$comment": "orchestra.sh health: CLI worker'larina canli ping. Kotasi dolan (quota) ve kirik (broken) worker'lar route'ta aday olmaz. schedule install bunu interval_sec'te bir calistirir; route da onbellek eskiyse yeniler.",
+    "interval_sec": 14400,
+    "ping_timeout_sec": 90
+  },
+  "subagents": {
+    "$comment": "Claude Code alt ajanlari. dispatch.sh'tan GECMEZ: orkestrator Agent(subagent_type: \"general-purpose\", model: <model>) ile calistirir. 'model' Agent tool'un model alanidir.",
+    "claude-haiku": {
+      "enabled": true,
+      "model": "haiku",
+      "roles": [
+        "loop"
+      ],
+      "use_for": "Hizli ve ucuz. Toplu mekanik is, tekrarli kucuk duzenlemeler, dosya tarama."
+    },
+    "claude-sonnet": {
+      "enabled": true,
+      "model": "sonnet",
+      "roles": [
+        "implement",
+        "loop"
+      ],
+      "use_for": "Varsayilan uygulayici. Ozellik, hata duzeltme, refactor, test yazma."
+    },
+    "claude-opus": {
+      "enabled": true,
+      "model": "opus",
+      "roles": [
+        "implement",
+        "review"
+      ],
+      "use_for": "En guclu. Zor uygulama, mimari karar, derin kod incelemesi, guvenlik, son dogrulama."
+    }
+  },
   "routes": {
     "cursor": {
       "engine": "agent",

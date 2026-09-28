@@ -2,7 +2,14 @@
 # Test icin sahte Cursor Agent. Gercek agent gibi TEK JSON nesnesi basar.
 set -u
 [ "${1:-}" = "--list-models" ] && { echo "stub-model - Stub"; exit 0; }
-case "${STUB_MODE:-ok}" in
+# STUB_AGENT_MODE yalnizca bu engine'i etkiler (saglik testleri icin).
+case "${STUB_AGENT_MODE:-${STUB_MODE:-ok}}" in
+  quota)
+    # Gercek Cursor kotasi dolunca (2026-09-06): ActionRequiredError: You're out of usage
+    echo "ActionRequiredError: You're out of usage. Upgrade or wait for your limit to reset." >&2
+    exit 1 ;;
+  hang)
+    sleep 30; exit 0 ;;
   ok)
     # DIKKAT: is_error BOOLEAN false. jq'da "false // empty" -> empty oldugu icin
     # bu deger yanlis parse edilirse basarili kosu KIRIK gorunur (gercek bir bug'di).

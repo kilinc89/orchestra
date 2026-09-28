@@ -51,5 +51,47 @@
       "model": "test-cursor-model",
       "role": "review"
     }
+  },
+  "subagents": {
+    "s-fast": {
+      "enabled": true,
+      "model": "haiku",
+      "roles": [
+        "loop"
+      ]
+    },
+    "s-impl": {
+      "enabled": true,
+      "model": "sonnet",
+      "roles": [
+        "implement",
+        "loop"
+      ]
+    },
+    "s-deep": {
+      "enabled": true,
+      "model": "opus",
+      "roles": [
+        "implement",
+        "review"
+      ]
+    },
+    "s-off": {
+      "enabled": false,
+      "model": "opus",
+      "roles": [
+        "review"
+      ]
+    }
+  },
+  "jev": {
+    "min_confidence": {
+      "claude": 0.5,
+      "all": 0.4
+    }
+  },
+  "health": {
+    "interval_sec": 14400,
+    "ping_timeout_sec": 3
   }
 }

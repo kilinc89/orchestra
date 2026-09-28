@@ -79,3 +79,26 @@ worker_callable() {
 now_ms() { python3 -c 'import time;print(int(time.time()*1000))' 2>/dev/null || echo 0; }
 
 slugify() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | cut -c1-40 | sed 's/-$//'; }
+
+# --- saglik onbellegi (orchestra.sh health yazar, route okur) ---
+health_file() { printf '%s' "${ORCHESTRA_HEALTH_FILE:-$HOME/.cache/orchestra/health.json}"; }
+
+# workers.json "health" blogu; yoksa varsayilan.
+hcfg() {
+  jq -r --arg f "$1" --arg d "$2" '(.health // {})[$f] // $d | tostring' "$(workers_file)"
+}
+
+# Onbellegin yasi (sn). Onbellek yoksa ya da okunamiyorsa bos.
+health_age() {
+  local hf; hf="$(health_file)"
+  [ -f "$hf" ] || return 0
+  jq -r --argjson now "$(date +%s)" '($now - (.checked_at // 0)) | floor' "$hf" 2>/dev/null || true
+}
+
+# Secime kapali worker'lar: son kontrolde kota dolu ya da kirik. Satir basina "ad<TAB>durum".
+unhealthy_workers() {
+  local hf; hf="$(health_file)"
+  [ -f "$hf" ] || return 0
+  jq -r '(.workers // {}) | to_entries[] | select(.value.status=="quota" or .value.status=="broken")
+    | "\(.key)\t\(.value.status)"' "$hf" 2>/dev/null || true
+}

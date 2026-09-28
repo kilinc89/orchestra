@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Test icin sahte launchctl: gercek launchd'ye dokunmaz, cagrilari kaydeder.
+[ -n "${STUB_LAUNCHCTL_LOG:-}" ] && echo "$*" >> "$STUB_LAUNCHCTL_LOG"
+case "${1:-}" in
+  print) [ -n "${STUB_LAUNCHCTL_LOADED:-}" ] ;;
+  *) exit 0 ;;
+esac

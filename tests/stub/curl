@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Test icin sahte curl: TypeSafe /v1/systemone yanitini taklit eder.
+# Istek govdesindeki tek Choice sorusunu (role ya da worker) cevaplar.
+#   STUB_JEV_MODE       ok | low | http401
+#   STUB_JEV_ROLE       role sorusunun cevabi (varsayilan: ilk secenek)
+#   STUB_JEV_ROLE_CONF  role guveni (varsayilan 0.9)
+#   STUB_JEV_WORKER     worker sorusunun cevabi (varsayilan: ilk secenek)
+#   STUB_JEV_CONF       worker guveni (varsayilan 0.93; low modunda 0.31)
+#   STUB_CURL_ARGV / STUB_CURL_STDIN / STUB_CURL_BODIES  verilirse kaydedilir
+set -u
+out=''; body=''
+args=("$@")
+while (($#)); do
+  case "$1" in
+    -o) out="$2"; shift ;;
+    --data-binary) body="${2#@}"; shift ;;
+  esac
+  shift
+done
+stdin="$(cat)"
+[ -n "${STUB_CURL_ARGV:-}" ] && printf '%s\n' "${args[@]}" > "$STUB_CURL_ARGV"
+[ -n "${STUB_CURL_STDIN:-}" ] && printf '%s\n' "$stdin" > "$STUB_CURL_STDIN"
+[ -n "${STUB_CURL_BODIES:-}" ] && { cat "$body"; echo; } >> "$STUB_CURL_BODIES"
+
+mode="${STUB_JEV_MODE:-ok}"
+if [ "$mode" = http401 ]; then
+  # Gercek API bu bicimi dondurur (2026-09-28 canli gozlem).
+  echo '{"detail":{"error_type":"authentication_error","message":"invalid api key"}}' > "$out"; printf '401'; exit 0
+fi
+q="$(jq -r '.questions|keys[0]' "$body")"
+if [ "$q" = role ]; then
+  pick="${STUB_JEV_ROLE:-$(jq -r '.questions.role.criteria|keys[0]' "$body")}"; conf="${STUB_JEV_ROLE_CONF:-0.9}"
+else
+  pick="${STUB_JEV_WORKER:-$(jq -r '.questions.worker.criteria|keys[0]' "$body")}"; conf="${STUB_JEV_CONF:-0.93}"
+  [ "$mode" = low ] && conf=0.31
+fi
+jq -n --arg q "$q" --arg p "$pick" --argjson c "$conf" --slurpfile b "$body" '{
+  model: "jev-stub",
+  answers: {($q): {type:"choice", choice:$p, confidence:$c,
+    probabilities: ($b[0].questions[$q].criteria | with_entries(.value = (if .key==$p then $c else 0 end)))}},
+  usage: {input_tokens: 100, output_tokens: 10}
+}' > "$out"
+printf '200'

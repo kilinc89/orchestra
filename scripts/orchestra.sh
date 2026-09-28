@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Orchestra - Claude orkestre eder; codex (GPT-5.6) ve agy (Gemini) worker calisir.
-# Alt komutlar: preflight | workers | run | loop
+# Alt komutlar: preflight | workers | doctor | run | loop | route | jev-key | health | schedule
 set -euo pipefail
 . "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/lib.sh"
 
@@ -14,6 +14,10 @@ Kullanim:
   orchestra.sh doctor [--worker W]
   orchestra.sh run   --tasks FILE [--workspace DIR] [--max-iter N] [--accept CMD] [--force]
   orchestra.sh loop  --worker W --prompt TEXT --until CMD [--workspace DIR] [--max-iter N] [--force]
+  orchestra.sh route --tasks FILE [--out FILE] [--pool claude|all] [--exclude w1,w2] | --prompt TEXT
+  orchestra.sh jev-key set|status|delete
+  orchestra.sh health [--if-stale] [--quiet]
+  orchestra.sh schedule install|remove|status
 
   doctor         her worker'a GERCEK bir ping atar. 'workers' yalnizca config
                  kontrolu yapar; doctor calisan yolu kanitlar. Ucret harcar.
@@ -22,6 +26,16 @@ Kullanim:
   --accept CMD   kabul kriteri. Cikis 0 ise is bitti; degilse dongu bir tur daha doner.
   --max-iter N   ust sinir (varsayilan 3). Sinirsiz dongu yok.
   --force        kirli/versiyonsuz workspace'te tam yetkiyi zorla.
+
+  route          "worker": "auto" gorevlerini Jev'e (TypeSafe) sordurup worker atar.
+                 --pool claude: yalnizca Claude alt ajanlari (Orchestra, esik 0.5)
+                 --pool all:    + GPT/Gemini CLI worker'lari (OrchestraG, esik 0.4)
+                 Emin olmadigi gorevi atamaz, "auto" birakir (cikis 2).
+  jev-key        TypeSafe anahtarini Keychain'de saklar/gosterir/siler.
+  health         her CLI worker'a paralel canli ping atar; sonucu (ok/quota/broken)
+                 ~/.cache/orchestra/health.json'a yazar. route kota dolu ve kirik
+                 worker'lari secmez. --if-stale: onbellek interval_sec'ten yeniyse atla.
+  schedule       health'i her 4 saatte bir calistiran macOS LaunchAgent'i kurar/kaldirir.
 USAGE
 }
 
@@ -54,13 +68,20 @@ guard_workspace() {
 }
 
 cmd_workers() {
-  printf '%-14s %-6s %-10s %-24s %-8s %s\n' WORKER ACIK ROL MODEL CLI 'CAGRILABILIR'
-  local w r
+  printf '%-14s %-6s %-10s %-24s %-8s %-10s %s\n' WORKER ACIK ROL MODEL CLI SAGLIK 'CAGRILABILIR'
+  local w r h hf; hf="$(health_file)"
   for w in $(jq -r '.workers|keys[]' "$(workers_file)"); do
     r="$(wcfg "$w" route)"; [ -n "$r" ] || r="$(dcfg route)"
-    printf '%-14s %-6s %-10s %-24s %-8s %s\n' \
+    h="-"; [ -f "$hf" ] && h="$(jq -r --arg w "$w" '.workers[$w].status // "-"' "$hf" 2>/dev/null || echo -)"
+    printf '%-14s %-6s %-10s %-24s %-8s %-10s %s\n' \
       "$w" "$(wcfg "$w" enabled)" "$(wcfg "$w" role)" "$(wcfg "$w" model)" \
-      "$(rcfg "$r" engine)" "$(worker_callable "$w" || true)"
+      "$(rcfg "$r" engine)" "$h" "$(worker_callable "$w" || true)"
+  done
+  # Claude Code alt ajanlari: CLI yok, orkestrator Agent tool ile cagirir.
+  jq -r '(.subagents // {}) | to_entries[] | select(.key|startswith("$")|not)
+    | [.key, (.value.enabled != false|tostring), (.value.roles|join("/")), .value.model]
+    | @tsv' "$(workers_file)" | while IFS="$(printf '\t')" read -r w e r m; do
+    printf '%-14s %-6s %-10s %-24s %-8s %-10s %s\n' "$w" "$e" "$r" "$m" "Agent" "-" "alt ajan"
   done
 }
 
@@ -165,6 +186,151 @@ cmd_doctor() {
   rm -rf "$tmp"
 }
 
+# --- saglik kontrolu: her CLI worker'a paralel canli ping, sonuc onbellege ---
+# route bu onbellegi okur ve kotasi dolan / kirik worker'lari aday listesinden cikarir.
+# Kota hatasi metni (2026-09-06 canli): "ActionRequiredError: You're out of usage".
+QUOTA_RE="out of usage|ActionRequiredError|usage limit|quota|rate.?limit|insufficient_quota|too many requests|(^|[^0-9])429([^0-9]|$)"
+
+cmd_health() {
+  local if_stale=0 quiet=0
+  while (($#)); do
+    case "$1" in
+      --if-stale) if_stale=1; shift ;;
+      --quiet)    quiet=1; shift ;;
+      *) die "health: bilinmeyen secenek: $1" ;;
+    esac
+  done
+  local hf interval ptimeout age
+  hf="$(health_file)"; interval="$(hcfg interval_sec 14400)"; ptimeout="$(hcfg ping_timeout_sec 90)"
+  if [ "$if_stale" = 1 ]; then
+    age="$(health_age)"
+    if [ -n "$age" ] && [ "$age" -lt "$interval" ]; then return 0; fi
+    log "saglik onbellegi $( [ -n "$age" ] && echo "${age}s eski" || echo yok ); yenileniyor"
+  fi
+  mkdir -p "$(dirname "$hf")"
+
+  # Ayni anda iki kontrol calismasin (zamanlayici + route). 15 dk'dan eski kilit bayattir.
+  # EXIT trap'i fonksiyon bittikten sonra calisir: local degil global degisken.
+  HEALTH_LOCK="$hf.lock"
+  if ! mkdir "$HEALTH_LOCK" 2>/dev/null; then
+    if [ -n "$(find "$HEALTH_LOCK" -maxdepth 0 -mmin +15 2>/dev/null)" ]; then
+      rm -rf "$HEALTH_LOCK"; mkdir "$HEALTH_LOCK" 2>/dev/null || { warn "saglik kilidi alinamadi"; return 0; }
+    else
+      log "baska bir saglik kontrolu suruyor; mevcut onbellek kullaniliyor"; return 0
+    fi
+  fi
+  local tmp; tmp="$(mktemp -d -t orchestra-health)"; HEALTH_TMP="$tmp"
+  trap 'rm -rf "${HEALTH_LOCK:-}" "${HEALTH_TMP:-}"' EXIT
+  printf '%s' 'Reply with exactly one word: PONG' > "$tmp/p.txt"
+
+  local w why pids=() dogs=() names=()
+  for w in $(enabled_workers); do
+    mkdir -p "$tmp/$w"
+    why="$(worker_callable "$w" 2>/dev/null || true)"
+    if [ "$why" != "ok" ]; then printf '%s' "$why" > "$tmp/$w/unavailable"; continue; fi
+    "$ROOT/scripts/dispatch.sh" --worker "$w" --task-id "$w" \
+      --prompt-file "$tmp/p.txt" --out-dir "$tmp/$w" >/dev/null 2>&1 &
+    local pid=$!
+    # dispatch zaman asimini her engine'de uygulamiyor; bekci burada.
+    ( sleep "$ptimeout"; : > "$tmp/$w/timeout"; pkill -TERM -P "$pid" 2>/dev/null; kill -TERM "$pid" 2>/dev/null ) \
+      >/dev/null 2>&1 &
+    dogs+=($!); disown $! 2>/dev/null || true
+    pids+=("$pid"); names+=("$w")
+  done
+  if ((${#pids[@]})); then for p in "${pids[@]}"; do wait "$p" 2>/dev/null || true; done; fi
+  # Bekcinin once sleep cocugunu oldur, yoksa yetim sleep ptimeout boyunca kalir.
+  if ((${#dogs[@]})); then for p in "${dogs[@]}"; do pkill -P "$p" 2>/dev/null || true; kill "$p" 2>/dev/null || true; done; fi
+
+  local out='{}' st detail text
+  for w in $(enabled_workers); do
+    if [ -f "$tmp/$w/unavailable" ]; then
+      st=unavailable; detail="$(cat "$tmp/$w/unavailable")"
+    elif [ -f "$tmp/$w/timeout" ] && [ "$(jq -r .status "$tmp/$w/result.json" 2>/dev/null)" != ok ]; then
+      st=broken; detail="zaman asimi (${ptimeout}s)"
+    elif [ "$(jq -r .status "$tmp/$w/result.json" 2>/dev/null)" = ok ]; then
+      st=ok; detail="$(jq -r '(.duration_ms/1000|floor|tostring)+"s"' "$tmp/$w/result.json")"
+    else
+      text="$(jq -r '.error // ""' "$tmp/$w/result.json" 2>/dev/null; tail -c 600 "$tmp/$w/stderr.log" 2>/dev/null; head -c 600 "$tmp/$w/last.txt" 2>/dev/null)"
+      if printf '%s' "$text" | grep -qiE "$QUOTA_RE"; then st=quota; else st=broken; fi
+      detail="$(printf '%s' "$text" | tr '\n' ' ' | head -c 160)"
+      [ -n "$detail" ] || detail="sonuc yok"
+    fi
+    out="$(jq -c --arg w "$w" --arg s "$st" --arg d "$detail" --arg m "$(wcfg "$w" model)" \
+      '. + {($w): {status:$s, model:$m, detail:$d}}' <<<"$out")"
+  done
+  jq -n --argjson ws "$out" --argjson t "$(date +%s)" --arg iso "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --argjson iv "$interval" '{checked_at:$t, checked_at_iso:$iso, interval_sec:$iv, workers:$ws}' > "$hf.tmp"
+  mv "$hf.tmp" "$hf"
+  rm -rf "$HEALTH_LOCK" "$tmp"; HEALTH_LOCK=''; HEALTH_TMP=''
+  log "saglik onbellegi yazildi: $hf"
+  [ "$quiet" = 1 ] || health_table
+}
+
+health_table() {
+  local hf; hf="$(health_file)"
+  [ -f "$hf" ] || { echo "saglik onbellegi yok -> orchestra.sh health"; return 1; }
+  printf 'son kontrol: %s (%ss once)\n' "$(jq -r .checked_at_iso "$hf")" "$(health_age)"
+  printf '%-14s %-12s %s\n' WORKER DURUM DETAY
+  jq -r '.workers|to_entries[]|[.key,.value.status,(.value.detail|.[0:70])]|@tsv' "$hf" \
+    | while IFS="$(printf '\t')" read -r w s d; do printf '%-14s %-12s %s\n' "$w" "$s" "$d"; done
+}
+
+# --- zamanlayici: macOS LaunchAgent, health'i her interval_sec'te bir calistirir ---
+cmd_schedule() {
+  local label='com.orchestra.health'
+  local dir="${ORCHESTRA_LAUNCHD_DIR:-$HOME/Library/LaunchAgents}"
+  local plist="$dir/$label.plist" lc="${ORCHESTRA_LAUNCHCTL:-launchctl}" dom="gui/$(id -u)"
+  local logf; logf="$(dirname "$(health_file)")/health.log"
+  xml() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+  case "${1:-status}" in
+    install)
+      local iv; iv="$(hcfg interval_sec 14400)"
+      mkdir -p "$dir" "$(dirname "$logf")"
+      # launchd'nin PATH'i cok dar; agent/codex/agy/jq bulunabilsin diye kurulum anindaki PATH yazilir.
+      cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$label</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>$(xml "$ROOT/scripts/orchestra.sh")</string>
+    <string>health</string>
+    <string>--quiet</string>
+  </array>
+  <key>StartInterval</key><integer>$iv</integer>
+  <key>RunAtLoad</key><true/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>$(xml "$PATH")</string>
+    <key>HOME</key><string>$(xml "$HOME")</string>
+  </dict>
+  <key>StandardOutPath</key><string>$(xml "$logf")</string>
+  <key>StandardErrorPath</key><string>$(xml "$logf")</string>
+</dict>
+</plist>
+PLIST
+      "$lc" bootout "$dom/$label" >/dev/null 2>&1 || true
+      "$lc" bootstrap "$dom" "$plist" || die "launchctl bootstrap basarisiz: $plist"
+      log "zamanlayici kuruldu: her $((iv/3600)) saatte bir ($plist)"
+      log "log: $logf" ;;
+    remove)
+      "$lc" bootout "$dom/$label" >/dev/null 2>&1 || true
+      rm -f "$plist"; log "zamanlayici kaldirildi" ;;
+    status)
+      if [ -f "$plist" ]; then
+        printf 'zamanlayici: kurulu (%s)\n' "$plist"
+        "$lc" print "$dom/$label" >/dev/null 2>&1 && echo "launchd: yuklu" || echo "launchd: YUKLU DEGIL -> orchestra.sh schedule install"
+      else
+        echo "zamanlayici: kurulu degil -> orchestra.sh schedule install"
+      fi
+      health_table || true ;;
+    *) die "schedule: install|remove|status" ;;
+  esac
+}
+
 cmd_run() {
   local tasks_file='' ws="$PWD" max_iter=3 accept='' force=0
   while (($#)); do
@@ -180,6 +346,10 @@ cmd_run() {
   [ -n "$tasks_file" ] || die "run: --tasks zorunlu"
   [ -f "$tasks_file" ] || die "run: gorev dosyasi yok: $tasks_file"
   jq empty "$tasks_file" 2>/dev/null || die "run: --tasks gecerli JSON degil"
+  local unrouted; unrouted="$(jq -r '[.tasks[]|select((.worker//"auto")=="auto")|.id]|join(",")' "$tasks_file")"
+  [ -z "$unrouted" ] || die "run: worker'i atanmamis gorev var ($unrouted). Once: orchestra.sh route --tasks $tasks_file --out FILE"
+  local subs; subs="$(jq -r --slurpfile w "$(workers_file)" '[.tasks[]|select(.worker as $x|($w[0].subagents//{})|has($x))|.id]|join(",")' "$tasks_file")"
+  [ -z "$subs" ] || die "run: Claude alt ajanina atanmis gorev var ($subs). Bunlari Agent tool ile calistir, run'a verme."
   ws="$(cd -- "$ws" && pwd -P)"
   guard_workspace "$ws" "$force"
 
@@ -274,6 +444,10 @@ case "$sub" in
   doctor)    cmd_doctor "$@" ;;
   run)       cmd_run "$@" ;;
   loop)      cmd_loop "$@" ;;
+  route)     exec "$ROOT/scripts/jev.sh" route "$@" ;;
+  jev-key)   exec "$ROOT/scripts/jev.sh" key "$@" ;;
+  health)    cmd_health "$@" ;;
+  schedule)  cmd_schedule "$@" ;;
   ''|--help|-h) usage ;;
   *) usage >&2; exit 64 ;;
 esac
