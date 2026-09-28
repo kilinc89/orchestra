@@ -2,6 +2,10 @@
 
 Claude orkestre eder. GPT-5.6 ailesi, Gemini, Claude (Sonnet/Opus) ve Composer worker olarak çalışır.
 
+Orkestratör modeli **Claude Opus 5.5** (`claude-opus-5-5`), `medium` effort ile sabitlenmiştir:
+`SKILL.md` frontmatter'ındaki `model:` ve `effort:` alanları, skill çalıştığı sürece oturumu bu
+modele ve seviyeye geçirir. Worker modelleri bundan etkilenmez; onlar `workers.json`'dan gelir.
+
 Claude planlar, işi böler, worker'ları paralel çalıştırır, kanıt toplar, doğrular
 ve kabul kriteri geçene kadar döngüye sokar. Claude worker grafiğinin içinde
 değildir — kod yazmaz, orkestre eder.

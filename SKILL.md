@@ -1,9 +1,14 @@
 ---
 name: orchestra
 description: Claude'u orkestratör; Cursor Agent, Codex ve Antigravity CLI'ları üzerinden GPT, Claude ve Gemini modellerini worker olarak çalıştırır. Görevi böl, worker'ları paralel çalıştır, kanıt topla, doğrula, kabul kriteri geçene kadar döngüye sok. Kullanıcı $orchestra dediğinde veya birden fazla modele iş dağıtmak istediğinde kullan.
+model: claude-opus-5-5
+effort: medium
 ---
 
 # Orchestra
+
+Orkestratör **Claude Opus 5.5**'tir (`claude-opus-5-5`) ve `medium` effort ile
+çalışır (frontmatter'daki `model:` ve `effort:` alanları). Bu yalnızca orkestratörü belirler; worker modelleri `workers.json`'dan gelir.
 
 Claude planlar, dağıtır, doğrular ve raporlar. Uygulamayı worker modeller yapar.
 Claude worker grafiğinin **içinde değildir** — kod yazmaz, sadece orkestre eder.
